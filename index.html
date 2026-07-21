@@ -6,52 +6,146 @@
     <title>Chord Helper</title>
     <script src="https://cdn.jsdelivr.net/npm/svguitar@2.5.1/dist/svguitar.umd.js"></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f8f9fa; }
+        /* BASE & THEMES */
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --border: #dddddd;
+        }
+
+        body.theme-dark {
+            --primary: #ecf0f1;
+            --accent: #ffcc00;
+            --bg: #1a1a1a;
+            --surface: #2d2d2d;
+            --border: #444444;
+        }
+
+        body.theme-neon {
+            --primary: #ffffff;
+            --accent: #00ffcc;
+            --bg: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            --surface: rgba(0,0,0,0.4);
+            --border: #00ffcc;
+        }
+
+        body.theme-high-contrast {
+            --primary: #000000;
+            --accent: #0000ff;
+            --bg: #ffffff;
+            --surface: #ffffff;
+            --border: #000000;
+        }
+
+        /* STRUCTURAL STYLES */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg); color: var(--primary);
-            max-width: 800px; margin: 0 auto; padding: 20px; text-align: center;
+            background: var(--bg);
+            color: var(--primary);
+            min-height: 100vh;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            transition: background 0.3s, color 0.3s;
         }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
         .section {
-            background: white; padding: 20px; border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px;
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            transition: background 0.3s;
         }
+
         .controls-row {
-            display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
-        .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-        button, select {
-            background-color: white; border: 2px solid var(--accent);
-            color: var(--accent); padding: 8px 14px; border-radius: 6px;
-            font-size: 16px; font-weight: bold; cursor: pointer; outline: none;
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
         }
-        button:hover, button.active { background-color: var(--accent); color: white; }
-        select { color: var(--primary); border-color: #ddd; }
-        .tuner-btn { font-size: 14px; padding: 6px 10px; border-color: #aaa; color: #555; }
-        
-        #chord-diagram { width: 100%; max-width: 320px; height: 350px; margin: 0 auto; }
-        
-        .pos-controls {
-            display: flex; justify-content: center; align-items: center; gap: 15px;
-            margin-top: -10px; margin-bottom: 15px;
-        }
-        .pos-controls button { padding: 4px 12px; font-size: 18px; }
-        #variant-input {
-            background-color: white;
+
+        button, select, #variant-input {
+            background-color: var(--surface);
             border: 2px solid var(--accent);
             color: var(--primary);
             padding: 8px 14px;
             border-radius: 6px;
             font-size: 16px;
             font-weight: bold;
+            cursor: pointer;
             outline: none;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        #variant-input {
             width: 140px;
         }
+
+        button:hover, button.active {
+            background-color: var(--accent);
+            color: var(--surface);
+        }
+
+        .tuner-btn {
+            font-size: 14px;
+            padding: 6px 10px;
+            border-color: var(--border);
+            color: var(--primary);
+        }
+
+        #chord-diagram {
+            width: 100%;
+            max-width: 320px;
+            height: 350px;
+            margin: 0 auto;
+        }
+
+        .pos-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: -10px;
+            margin-bottom: 15px;
+        }
+
+            .pos-controls button {
+                padding: 4px 12px;
+                font-size: 18px;
+            }
     </style>
 </head>
 <body>
 
-    <h1>Chord Helper</h1>
+    <div class="header-row">
+        <h1 style="margin: 0;">Chord Helper</h1>
+        <select id="theme-selector">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="neon">Neon</option>
+            <option value="high-contrast">High Contrast</option>
+        </select>
+    </div>
 
     <div class="section">
         <div class="controls-row">
@@ -82,20 +176,29 @@
             <button id="next-pos">&gt;</button>
         </div>
 
-        <button id="strum-btn" style="width: 200px; display: none;">🎵 Strum Chord</button>
+        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+            <button id="strum-btn" style="width: 160px; display: none;">Strum</button>
+            <button id="add-chord-btn" style="width: 160px; display: none;">➕ Add to Block</button>
+        </div>
     </div>
 
     <!-- MINI TUNER -->
     <div class="section">
         <h3 style="margin-top:0; font-size:16px;">Reference Tuner</h3>
         <div class="btn-group">
-            <button class="tuner-btn" onclick="playString(82.41)">E</button>
-            <button class="tuner-btn" onclick="playString(110.00)">A</button>
-            <button class="tuner-btn" onclick="playString(146.83)">D</button>
-            <button class="tuner-btn" onclick="playString(196.00)">G</button>
-            <button class="tuner-btn" onclick="playString(246.94)">B</button>
-            <button class="tuner-btn" onclick="playString(329.63)">e</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 82.41)">E</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 110.00)">A</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 146.83)">D</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 196.00)">G</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 246.94)">B</button>
+            <button class="tuner-btn" onclick="toggleTuner(this, 329.63)">e</button>
         </div>
+    </div>
+
+    <!-- BOTTOM DRAFT BAR -->
+    <div id="draft-nav-bar" style="position: fixed; bottom: -100px; left: 0; right: 0; background: var(--surface); padding: 15px; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transition: bottom 0.3s ease-in-out; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--accent); z-index: 1000; max-width: 800px; margin: 0 auto; box-sizing: border-box;">
+        <span style="font-weight: bold; font-size: 16px;"><span id="draft-count" style="color: var(--accent);">0</span> Chords in Draft</span>
+        <button id="view-draft-btn" style="background-color: var(--accent); color: white; border-color: var(--accent);">Edit Block</button>
     </div>
 
     <script>
@@ -192,7 +295,7 @@
         function parseChordString(fretStr) {
             const frets = fretStr.split(' ');
             const fingers = [];
-            
+
             frets.forEach((fret, index) => {
                 const stringNum = 6 - index; // Map index 0 to guitar string 6 (low E)
                 const val = fret.toLowerCase() === 'x' ? 'x' : parseInt(fret, 10);
@@ -204,7 +307,7 @@
         // --- 3. STATE & AUDIO ---
         let audioCtx;
         function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-        
+
         let chart;
         let currentRoot = 'A';
         let currentVariant = 'minor';
@@ -212,7 +315,7 @@
         let activeChordData = null; // Holds the parsed [[string, fret]] data
 
         function initChart() {
-            document.getElementById('chord-diagram').innerHTML = ''; 
+            document.getElementById('chord-diagram').innerHTML = '';
             chart = new window.svguitar.SVGuitarChord('#chord-diagram');
         }
 
@@ -231,6 +334,9 @@
 
                 const posData = positions[currentPosIndex];
                 activeChordData = parseChordString(posData.frets);
+                activeChordData.baseFret = posData.baseFret;
+
+                const currentThemeColor = getComputedStyle(document.body).getPropertyValue('--primary').trim();
 
                 chart.chord({
                     fingers: activeChordData.fingers,
@@ -239,11 +345,12 @@
                 })
                     .configure({
                         title: `${currentRoot} ${currentVariant}`,
-                        color: '#2c3e50'
+                        color: currentThemeColor
                     })
                     .draw();
 
                 strumBtn.style.display = 'inline-block';
+                document.getElementById('add-chord-btn').style.display = 'inline-block';
 
                 if (positions.length > 1) {
                     posControls.style.display = 'flex';
@@ -258,6 +365,7 @@
                 chart = null;
                 strumBtn.style.display = 'none';
                 posControls.style.display = 'none';
+                document.getElementById('add-chord-btn').style.display = 'none';
             }
         }
 
@@ -283,6 +391,33 @@
             }
         });
 
+        // --- SEQUENCE DRAFTING STATE ---
+        let currentBlockDraft = [];
+
+        document.getElementById('add-chord-btn').addEventListener('click', () => {
+            if (!activeChordData) return;
+
+            // Save current chord's state
+            currentBlockDraft.push({
+                root: currentRoot,
+                variant: currentVariant,
+                positionIndex: currentPosIndex,
+                fingers: activeChordData.fingers,
+                baseFret: chordDB[currentRoot][currentVariant][currentPosIndex].baseFret
+            });
+
+            // Visual feedback to user
+            const btn = document.getElementById('add-chord-btn');
+            const originalText = btn.innerText;
+            btn.innerText = `Added! (${currentBlockDraft.length})`;
+            setTimeout(() => { btn.innerText = originalText; }, 1000);
+
+            // Update the counter, slide the bar up, and pad the body so it doesn't hide the tuner
+            document.getElementById('draft-count').innerText = currentBlockDraft.length;
+            document.getElementById('draft-nav-bar').style.bottom = '0';
+            document.body.style.paddingBottom = '80px';
+        });
+
         document.getElementById('next-pos').addEventListener('click', () => {
             const positions = chordDB[currentRoot][currentVariant];
             if (currentPosIndex < positions.length - 1) {
@@ -301,6 +436,46 @@
         // --- 5. AUDIO PLAYBACK ---
         const openStrings = { 6: 82.41, 5: 110.00, 4: 146.83, 3: 196.00, 2: 246.94, 1: 329.63 };
 
+        let activeTunerOsc = null;
+        let activeTunerBtn = null;
+
+        function toggleTuner(btn, freq) {
+            initAudio();
+
+            // If clicking the same button, turn it off
+            if (activeTunerBtn === btn) {
+                if (activeTunerOsc) activeTunerOsc.stop();
+                btn.classList.remove('active');
+                activeTunerBtn = null;
+                activeTunerOsc = null;
+                return;
+            }
+
+            // Stop any currently playing string
+            if (activeTunerOsc) {
+                activeTunerOsc.stop();
+                activeTunerBtn.classList.remove('active');
+            }
+
+            // Start the new string (sustained)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // Set a comfortable, continuous volume
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+
+            activeTunerOsc = osc;
+            activeTunerBtn = btn;
+            btn.classList.add('active');
+        }
+
+        /* ---Plays a single note. Old code not in use. Might be useful later somewhere.---
         function playString(freq) {
             initAudio();
             const osc = audioCtx.createOscillator();
@@ -311,6 +486,7 @@
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 2.5);
         }
+        */
 
         document.getElementById('strum-btn').addEventListener('click', () => {
             if (!activeChordData) return;
@@ -318,10 +494,13 @@
             const now = audioCtx.currentTime;
             let delay = 0;
             const sortedFingers = [...activeChordData.fingers].sort((a, b) => b[0] - a[0]);
+            const baseFret = activeChordData.baseFret || 1;
 
             sortedFingers.forEach(([string, fret]) => {
                 if (fret !== 'x') {
-                    const freq = openStrings[string] * Math.pow(2, fret / 12);
+                    // Open strings (0) stay 0. Fretted notes shift up based on the position.
+                    const absoluteFret = fret === 0 ? 0 : (baseFret + fret - 1);
+                    const freq = openStrings[string] * Math.pow(2, absoluteFret / 12);
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, now + delay);
@@ -333,6 +512,16 @@
                     delay += 0.04;
                 }
             });
+        });
+
+        // --- 6. THEMES ---
+        document.getElementById('theme-selector').addEventListener('change', (e) => {
+            document.body.className = ''; // Clear old themes
+            if (e.target.value !== 'light') {
+                document.body.classList.add(`theme-${e.target.value}`);
+            }
+            // Re-render the chord to update its lines to the new theme color
+            renderChord();
         });
 
         window.onload = loadChordDatabase;
