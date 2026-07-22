@@ -139,12 +139,15 @@
 
     <div class="header-row">
         <h1 style="margin: 0;">Chord Helper</h1>
-        <select id="theme-selector">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="neon">Neon</option>
-            <option value="high-contrast">High Contrast</option>
-        </select>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="open-library-btn" style="padding: 6px 12px; font-size: 14px;">Library</button>
+            <select id="theme-selector">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="neon">Neon</option>
+                <option value="high-contrast">High Contrast</option>
+            </select>
+        </div>
     </div>
 
     <div class="section">
@@ -195,6 +198,34 @@
         </div>
     </div>
 
+    <!-- EDITOR VIEW (Hidden by default) -->
+    <div id="editor-view" class="section" style="display: none; min-height: 400px; text-align: left;">
+        <div class="header-row" style="margin-bottom: 20px;">
+            <button id="close-editor-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Back</button>
+            <h2 style="margin: 0; font-size: 18px;">Save Block</h2>
+            <button id="save-block-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">💾 Save</button>
+        </div>
+        <input type="text" id="block-name-input" placeholder="e.g., Verse 1, Chorus..." style="width: 100%; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; padding: 10px; border-radius: 6px; border: 2px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+        <div id="draft-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Draft items injected here -->
+        </div>
+
+        <!-- Note the Vivid Gold (#ffcc00) styling here for color-blind accessibility -->
+        <button id="clear-draft-btn" style="margin-top: 20px; width: 100%; background: transparent; color: #ffcc00; border-color: #ffcc00;">🗑️ Clear Draft</button>
+    </div>
+
+    <!-- LIBRARY VIEW (Hidden by default) -->
+    <div id="library-view" class="section" style="display: none; min-height: 400px; text-align: left;">
+        <div class="header-row" style="margin-bottom: 20px;">
+            <button id="close-library-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Back</button>
+            <h2 style="margin: 0; font-size: 18px;">Saved Blocks</h2>
+            <div style="width: 70px;"></div>
+        </div>
+        <div id="library-list" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Saved blocks get injected here -->
+        </div>
+    </div>
+
     <!-- BOTTOM DRAFT BAR -->
     <div id="draft-nav-bar" style="position: fixed; bottom: -100px; left: 0; right: 0; background: var(--surface); padding: 15px; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transition: bottom 0.3s ease-in-out; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--accent); z-index: 1000; max-width: 800px; margin: 0 auto; box-sizing: border-box;">
         <span style="font-weight: bold; font-size: 16px;"><span id="draft-count" style="color: var(--accent);">0</span> Chords in Draft</span>
@@ -202,10 +233,10 @@
     </div>
 
     <script>
-        // --- 1. DYNAMIC CHORD DATABASE ---
+        // --- DYNAMIC CHORD DATABASE ---
         let chordDB = {}; // Start with an empty object
 
-        // --- 1.5 FETCH AND ADAPT DATA ---
+        // --- FETCH AND ADAPT DATA ---
         async function loadChordDatabase() {
             const diagramContainer = document.getElementById('chord-diagram');
             diagramContainer.innerHTML = '<p style="color: #888; margin-top: 50%;">Loading chord database...</p>';
@@ -291,7 +322,7 @@
             });
         });
 
-        // --- 2. TRANSLATION LAYER ---
+        // --- TRANSLATION LAYER ---
         function parseChordString(fretStr) {
             const frets = fretStr.split(' ');
             const fingers = [];
@@ -304,7 +335,7 @@
             return { fingers };
         }
 
-        // --- 3. STATE & AUDIO ---
+        // --- STATE & AUDIO ---
         let audioCtx;
         function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 
@@ -369,7 +400,7 @@
             }
         }
 
-        // --- 4. EVENT LISTENERS ---
+        // --- EVENT LISTENERS ---
         // Smart listener for the datalist input
         const variantInput = document.getElementById('variant-input');
 
@@ -433,7 +464,7 @@
             }
         });
 
-        // --- 5. AUDIO PLAYBACK ---
+        // --- AUDIO PLAYBACK ---
         const openStrings = { 6: 82.41, 5: 110.00, 4: 146.83, 3: 196.00, 2: 246.94, 1: 329.63 };
 
         let activeTunerOsc = null;
@@ -514,7 +545,7 @@
             });
         });
 
-        // --- 6. THEMES ---
+        // --- THEMES ---
         document.getElementById('theme-selector').addEventListener('change', (e) => {
             document.body.className = ''; // Clear old themes
             if (e.target.value !== 'light') {
@@ -524,6 +555,135 @@
             renderChord();
         });
 
+        // --- EDITOR LOGIC ---
+        const mainSections = () => document.querySelectorAll('.section:not(#editor-view):not(#library-view)');
+
+        function toggleEditor(show) {
+            const editorView = document.getElementById('editor-view');
+            const draftBar = document.getElementById('draft-nav-bar');
+
+            if (show) {
+                mainSections().forEach(sec => sec.style.display = 'none');
+                editorView.style.display = 'block';
+                draftBar.style.display = 'none'; // Hide floating bar while editing
+                renderDraftList();
+            } else {
+                mainSections().forEach(sec => sec.style.display = 'block');
+                editorView.style.display = 'none';
+                if (currentBlockDraft.length > 0) draftBar.style.display = 'flex';
+            }
+        }
+
+        function renderDraftList() {
+            const list = document.getElementById('draft-list');
+            list.innerHTML = '';
+
+            currentBlockDraft.forEach((chord, index) => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px;';
+                item.innerHTML = `<strong>${chord.root} ${chord.variant}</strong> <span style="font-size: 14px; opacity: 0.8;">Pos ${chord.positionIndex + 1}</span>`;
+                list.appendChild(item);
+            });
+        }
+
+        document.getElementById('view-draft-btn').addEventListener('click', () => toggleEditor(true));
+        document.getElementById('close-editor-btn').addEventListener('click', () => toggleEditor(false));
+
+        document.getElementById('clear-draft-btn').addEventListener('click', () => {
+            currentBlockDraft = [];
+            document.getElementById('draft-count').innerText = '0';
+            document.getElementById('draft-nav-bar').style.bottom = '-100px';
+            document.body.style.paddingBottom = '0';
+            toggleEditor(false);
+        });
+
+        document.getElementById('save-block-btn').addEventListener('click', () => {
+            if (currentBlockDraft.length === 0) return alert("Nothing to save!");
+
+            const nameInput = document.getElementById('block-name-input');
+            const name = nameInput.value.trim() || 'Untitled Block';
+
+            // Fetch existing blocks from local storage or start fresh
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+
+            // Add new block with a unique ID for future editing/deleting
+            savedBlocks.push({ id: Date.now(), name: name, chords: currentBlockDraft });
+            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
+
+            alert(`"${name}" saved successfully to your device!`);
+
+            // Reset the app state and return to main view
+            document.getElementById('clear-draft-btn').click();
+            nameInput.value = '';
+        });
+
+        // --- LIBRARY LOGIC ---
+        function toggleLibrary(show) {
+            const libraryView = document.getElementById('library-view');
+            const draftBar = document.getElementById('draft-nav-bar');
+
+            if (show) {
+                mainSections().forEach(sec => sec.style.display = 'none');
+                document.getElementById('editor-view').style.display = 'none';
+                libraryView.style.display = 'block';
+                draftBar.style.display = 'none';
+                renderLibrary();
+            } else {
+                mainSections().forEach(sec => sec.style.display = 'block');
+                libraryView.style.display = 'none';
+                if (currentBlockDraft.length > 0) draftBar.style.display = 'flex';
+            }
+        }
+
+        function renderLibrary() {
+            const list = document.getElementById('library-list');
+            list.innerHTML = '';
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+
+            if (savedBlocks.length === 0) {
+                list.innerHTML = '<p style="color: var(--primary); opacity: 0.7; text-align: center; margin-top: 40px;">No blocks saved yet.</p>';
+                return;
+            }
+
+            savedBlocks.forEach(block => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;';
+
+                const header = document.createElement('div');
+                header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
+                header.innerHTML = `<strong>${block.name}</strong> <span style="font-size: 14px; opacity: 0.8;">${block.chords.length} chords</span>`;
+
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display: flex; gap: 8px; justify-content: space-between;';
+
+                const viewBtn = document.createElement('button');
+                viewBtn.innerText = '👀 View & Play';
+                viewBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
+                viewBtn.onclick = () => alert("Performance View is coming next!"); // Placeholder hook for Live Mode
+
+                const delBtn = document.createElement('button');
+                delBtn.innerText = '🗑️ Delete';
+                delBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px; background: transparent; color: #ffcc00; border-color: #ffcc00;';
+                delBtn.onclick = () => {
+                    if (confirm(`Are you sure you want to delete "${block.name}"?`)) {
+                        const updated = savedBlocks.filter(b => b.id !== block.id);
+                        localStorage.setItem('chordBlocks', JSON.stringify(updated));
+                        renderLibrary();
+                    }
+                };
+
+                actions.appendChild(viewBtn);
+                actions.appendChild(delBtn);
+                item.appendChild(header);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        }
+
+        document.getElementById('open-library-btn').addEventListener('click', () => toggleLibrary(true));
+        document.getElementById('close-library-btn').addEventListener('click', () => toggleLibrary(false));
+
+        // --- 8. INITIALIZATION ---
         window.onload = loadChordDatabase;
     </script>
 </body>
