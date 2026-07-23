@@ -163,8 +163,14 @@
                 <button class="root-btn">G</button>
             </div>
 
+            <div class="btn-group" id="accidental-buttons">
+                <button class="acc-btn active" data-acc="">♮</button>
+                <button class="acc-btn" data-acc="#">♯</button>
+                <button class="acc-btn" data-acc="b">♭</button>
+            </div>
+
             <!-- VARIANT SEARCH INPUT -->
-            <input type="text" id="variant-input" list="variant-list" placeholder="e.g. minor, m7, maj7, m7b5" value="">
+            <input type="text" id="variant-input" list="variant-list" placeholder="e.g. minor, m7, maj7" value="">
             <datalist id="variant-list">
                 <!-- Options will be injected here dynamically -->
             </datalist>
@@ -328,15 +334,39 @@
             variantInput.value = currentVariant === 'major' ? '' : currentVariant;
         }
 
+        function updateRootSelection() {
+            let target = selectedBaseRoot + selectedAccidental;
+            // Map common enharmonics to what the database actually uses
+            const enharmonics = { 'A#': 'Bb', 'Bb': 'A#', 'C#': 'Db', 'Db': 'C#', 'D#': 'Eb', 'Eb': 'D#', 'E#': 'F', 'Fb': 'E', 'F#': 'Gb', 'Gb': 'F#', 'G#': 'Ab', 'Ab': 'G#', 'B#': 'C', 'Cb': 'B' };
+            
+            if (chordDB[target]) {
+                currentRoot = target;
+            } else if (enharmonics[target] && chordDB[enharmonics[target]]) {
+                currentRoot = enharmonics[target];
+            } else {
+                currentRoot = target; // Fallback, will show "Not in database"
+            }
+            
+            currentPosIndex = 0;
+            updateVariantList(currentRoot);
+            renderChord();
+        }
+
         document.querySelectorAll('.root-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.root-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
-                currentRoot = e.target.innerText;
-                currentPosIndex = 0;
+                selectedBaseRoot = e.target.innerText.trim();
+                updateRootSelection();
+            });
+        });
 
-                updateVariantList(currentRoot);
-                renderChord();
+        document.querySelectorAll('.acc-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                selectedAccidental = e.target.getAttribute('data-acc');
+                updateRootSelection();
             });
         });
 
@@ -358,10 +388,12 @@
         function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 
         let chart;
+        let selectedBaseRoot = 'A';
+        let selectedAccidental = '';
         let currentRoot = 'A';
         let currentVariant = 'major';
         let currentPosIndex = 0;
-        let activeChordData = null; // Holds the parsed [[string, fret]] data
+        let activeChordData = null;
 
         function initChart() {
             document.getElementById('chord-diagram').innerHTML = '';
@@ -454,6 +486,7 @@
 
         // --- SEQUENCE DRAFTING STATE ---
         let currentBlockDraft = [];
+        let currentEditingBlockId = null;
 
         document.getElementById('add-chord-btn').addEventListener('click', () => {
             if (!activeChordData) return;
@@ -613,6 +646,7 @@
 
         document.getElementById('clear-draft-btn').addEventListener('click', () => {
             currentBlockDraft = [];
+            currentEditingBlockId = null;
             document.getElementById('draft-count').innerText = '0';
             document.getElementById('draft-nav-bar').style.bottom = '-100px';
             document.body.style.paddingBottom = '0';
@@ -628,10 +662,21 @@
             // Fetch existing blocks from local storage or start fresh
             const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
 
-            // Add new block with a unique ID for future editing/deleting
-            savedBlocks.push({ id: Date.now(), name: name, chords: currentBlockDraft });
-            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
+            if (currentEditingBlockId) {
+                // Update existing block
+                const blockIndex = savedBlocks.findIndex(b => b.id === currentEditingBlockId);
+                if (blockIndex > -1) {
+                    savedBlocks[blockIndex].name = name;
+                    savedBlocks[blockIndex].chords = currentBlockDraft;
+                } else {
+                    savedBlocks.push({ id: Date.now(), name: name, chords: currentBlockDraft });
+                }
+            } else {
+                // New block with unique ID
+                savedBlocks.push({ id: Date.now(), name: name, chords: currentBlockDraft });
+            }
 
+            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
             alert(`"${name}" saved successfully to your device!`);
 
             // Reset the app state and return to main view
@@ -682,7 +727,7 @@
                 actions.style.cssText = 'display: flex; gap: 8px; justify-content: space-between;';
 
                 const viewBtn = document.createElement('button');
-                viewBtn.innerText = '👀 View & Play';
+                viewBtn.innerText = 'View & Play';
                 viewBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
 
                 viewBtn.onclick = () => {
@@ -690,8 +735,27 @@
                     togglePerformance(true);
                 };
 
+                const editBtn = document.createElement('button');
+                editBtn.innerText = '✏️ Edit';
+                editBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
+                editBtn.onclick = () => {
+                    if (currentBlockDraft.length > 0) {
+                        if (!confirm("Warning: This will overwrite your current unsaved draft. Continue?")) return;
+                    }
+
+                    // Deep copy the saved chords into the draft so we don't accidentally edit local storage directly
+                    currentBlockDraft = JSON.parse(JSON.stringify(block.chords));
+                    currentEditingBlockId = block.id;
+
+                    document.getElementById('draft-count').innerText = currentBlockDraft.length;
+                    document.getElementById('block-name-input').value = block.name;
+
+                    toggleLibrary(false);
+                    toggleEditor(true);
+                };
+
                 const delBtn = document.createElement('button');
-                delBtn.innerText = '🗑️ Delete';
+                delBtn.innerText = 'Delete';
                 delBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px; background: transparent; color: #ffcc00; border-color: #ffcc00;';
                 delBtn.onclick = () => {
                     if (confirm(`Are you sure you want to delete "${block.name}"?`)) {
@@ -702,6 +766,7 @@
                 };
 
                 actions.appendChild(viewBtn);
+                actions.appendChild(editBtn);
                 actions.appendChild(delBtn);
                 item.appendChild(header);
                 item.appendChild(actions);
