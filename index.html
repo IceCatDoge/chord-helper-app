@@ -211,27 +211,54 @@
         <div class="header-row" style="margin-bottom: 20px;">
             <button id="close-editor-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Back</button>
             <h2 style="margin: 0; font-size: 18px;">Save Block</h2>
-            <button id="save-block-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">💾 Save</button>
+            <button id="save-block-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">Save</button>
         </div>
         <input type="text" id="block-name-input" placeholder="e.g., Verse 1, Chorus..." style="width: 100%; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; padding: 10px; border-radius: 6px; border: 2px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
         <div id="draft-list" style="display: flex; flex-direction: column; gap: 8px;">
             <!-- Draft items injected here -->
         </div>
 
-        <!-- Note the Vivid Gold (#ffcc00) styling here for color-blind accessibility -->
-        <button id="clear-draft-btn" style="margin-top: 20px; width: 100%; background: transparent; color: #ffcc00; border-color: #ffcc00;">🗑️ Clear Draft</button>
+        <button id="clear-draft-btn" style="margin-top: 20px; width: 100%; background: transparent; color: #ffcc00; border-color: #ffcc00;">Clear Draft</button>
     </div>
 
     <!-- LIBRARY VIEW (Hidden by default) -->
     <div id="library-view" class="section" style="display: none; min-height: 400px; text-align: left;">
         <div class="header-row" style="margin-bottom: 20px;">
             <button id="close-library-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Back</button>
-            <h2 style="margin: 0; font-size: 18px;">Saved Blocks</h2>
+            <div style="display: flex; gap: 10px;">
+                <button id="tab-blocks" class="active" style="background: var(--accent); color: white; padding: 6px 12px; font-size: 14px; border: none; border-radius: 4px;">Blocks</button>
+                <button id="tab-songs" style="background: var(--surface); color: var(--primary); padding: 6px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 4px;">Songs</button>
+            </div>
             <div style="width: 70px;"></div>
         </div>
-        <div id="library-list" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Saved blocks get injected here -->
+
+        <div id="library-blocks-container">
+            <div id="library-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Saved blocks get injected here -->
+            </div>
         </div>
+
+        <div id="library-songs-container" style="display: none;">
+            <button id="create-song-btn" style="width: 100%; padding: 10px; margin-bottom: 15px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold;">Create New Song</button>
+            <div id="library-songs-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+        </div>
+    </div>
+
+    <!-- SONG EDITOR VIEW (Hidden by default) -->
+    <div id="song-editor-view" class="section" style="display: none; min-height: 400px; text-align: left;">
+        <div class="header-row" style="margin-bottom: 20px;">
+            <button id="cancel-song-btn" style="padding: 6px 12px; font-size: 14px;">Cancel</button>
+            <h2 style="margin: 0; font-size: 18px;">Song Assembler</h2>
+            <button id="save-song-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">Save</button>
+        </div>
+        <input type="text" id="song-name-input" placeholder="Song Name (e.g. Wonderwall)" style="width: 100%; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; padding: 10px; border-radius: 6px; border: 2px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <select id="song-block-select" style="flex: 1; padding: 10px; border-radius: 6px; border: 2px solid var(--border); background: var(--surface); color: var(--primary); font-size: 14px;"></select>
+            <button id="add-block-to-song-btn" style="padding: 0 15px; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: bold;">Add Block</button>
+        </div>
+
+        <div id="song-draft-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;"></div>
     </div>
 
     <!-- PERFORMANCE VIEW (Hidden by default) -->
@@ -338,7 +365,7 @@
             let target = selectedBaseRoot + selectedAccidental;
             // Map common enharmonics to what the database actually uses
             const enharmonics = { 'A#': 'Bb', 'Bb': 'A#', 'C#': 'Db', 'Db': 'C#', 'D#': 'Eb', 'Eb': 'D#', 'E#': 'F', 'Fb': 'E', 'F#': 'Gb', 'Gb': 'F#', 'G#': 'Ab', 'Ab': 'G#', 'B#': 'C', 'Cb': 'B' };
-            
+
             if (chordDB[target]) {
                 currentRoot = target;
             } else if (enharmonics[target] && chordDB[enharmonics[target]]) {
@@ -346,7 +373,7 @@
             } else {
                 currentRoot = target; // Fallback, will show "Not in database"
             }
-            
+
             currentPosIndex = 0;
             updateVariantList(currentRoot);
             renderChord();
@@ -605,12 +632,12 @@
             renderChord();
 
             if (document.getElementById('performance-view') && document.getElementById('performance-view').style.display === 'block') {
-                renderPerformance(currentPerformanceBlockId);
+                renderPerformance(currentPerformanceId, currentPerformanceType);
             }
         });
 
         // --- EDITOR LOGIC ---
-        const mainSections = () => document.querySelectorAll('.section:not(#editor-view):not(#library-view):not(#performance-view)');
+        const mainSections = () => document.querySelectorAll('.section:not(#editor-view):not(#library-view):not(#performance-view):not(#song-editor-view)');
 
         function toggleEditor(show) {
             const editorView = document.getElementById('editor-view');
@@ -634,9 +661,63 @@
 
             currentBlockDraft.forEach((chord, index) => {
                 const item = document.createElement('div');
-                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px;';
+                // Added bottom margin so stacked items don't touch
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px; margin-bottom: 8px;';
+
                 const displayVariant = chord.variant === 'major' ? '' : chord.variant;
-                item.innerHTML = `<strong>${chord.root} ${displayVariant}</strong> <span style="font-size: 14px; opacity: 0.8;">Pos ${chord.positionIndex + 1}</span>`;
+
+                // Text container
+                const textDiv = document.createElement('div');
+                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong> <span style="font-size: 14px; opacity: 0.8; margin-left: 8px;">Pos ${chord.positionIndex + 1}</span>`;
+
+                // Controls container
+                const controlsDiv = document.createElement('div');
+                controlsDiv.style.cssText = 'display: flex; gap: 6px;';
+
+                // Move Up Button (hidden for the first item)
+                if (index > 0) {
+                    const upBtn = document.createElement('button');
+                    upBtn.innerText = '↑';
+                    upBtn.style.cssText = 'padding: 4px 10px; font-size: 16px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 4px;';
+                    upBtn.onclick = () => {
+                        [currentBlockDraft[index - 1], currentBlockDraft[index]] = [currentBlockDraft[index], currentBlockDraft[index - 1]];
+                        renderDraftList();
+                    };
+                    controlsDiv.appendChild(upBtn);
+                }
+
+                // Move Down Button (hidden for the last item)
+                if (index < currentBlockDraft.length - 1) {
+                    const downBtn = document.createElement('button');
+                    downBtn.innerText = '↓';
+                    downBtn.style.cssText = 'padding: 4px 10px; font-size: 16px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 4px;';
+                    downBtn.onclick = () => {
+                        [currentBlockDraft[index], currentBlockDraft[index + 1]] = [currentBlockDraft[index + 1], currentBlockDraft[index]];
+                        renderDraftList();
+                    };
+                    controlsDiv.appendChild(downBtn);
+                }
+
+                // Delete Button
+                const delBtn = document.createElement('button');
+                delBtn.innerText = '✕';
+                delBtn.style.cssText = 'padding: 4px 10px; font-size: 14px; background: transparent; color: #ff5555; border: 1px solid var(--border); border-radius: 4px;';
+                delBtn.onclick = () => {
+                    currentBlockDraft.splice(index, 1);
+                    document.getElementById('draft-count').innerText = currentBlockDraft.length;
+
+                    // If last chord is eleted, close
+                    if (currentBlockDraft.length === 0) {
+                        currentEditingBlockId = null;
+                        document.getElementById('draft-nav-bar').style.bottom = '-100px';
+                        toggleEditor(false);
+                    }
+                    renderDraftList();
+                };
+                controlsDiv.appendChild(delBtn);
+
+                item.appendChild(textDiv);
+                item.appendChild(controlsDiv);
                 list.appendChild(item);
             });
         }
@@ -692,6 +773,9 @@
             if (show) {
                 mainSections().forEach(sec => sec.style.display = 'none');
                 document.getElementById('editor-view').style.display = 'none';
+                if (document.getElementById('song-editor-view')) {
+                    document.getElementById('song-editor-view').style.display = 'none';
+                }
                 if (document.getElementById('performance-view')) {
                     document.getElementById('performance-view').style.display = 'none'; // Ensure performance view stays shut
                 }
@@ -736,7 +820,7 @@
                 };
 
                 const editBtn = document.createElement('button');
-                editBtn.innerText = '✏️ Edit';
+                editBtn.innerText = 'Edit';
                 editBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
                 editBtn.onclick = () => {
                     if (currentBlockDraft.length > 0) {
@@ -777,70 +861,319 @@
         document.getElementById('open-library-btn').addEventListener('click', () => toggleLibrary(true));
         document.getElementById('close-library-btn').addEventListener('click', () => toggleLibrary(false));
 
+        // --- SONGS LOGIC ---
+        let currentSongDraft = [];
+        let currentEditingSongId = null;
+
+        document.getElementById('tab-blocks').addEventListener('click', (e) => {
+            e.target.style.background = 'var(--accent)';
+            e.target.style.color = 'white';
+            e.target.style.border = 'none';
+
+            const tabSongs = document.getElementById('tab-songs');
+            tabSongs.style.background = 'var(--surface)';
+            tabSongs.style.color = 'var(--primary)';
+            tabSongs.style.border = '1px solid var(--border)';
+
+            document.getElementById('library-blocks-container').style.display = 'block';
+            document.getElementById('library-songs-container').style.display = 'none';
+        });
+
+        document.getElementById('tab-songs').addEventListener('click', (e) => {
+            e.target.style.background = 'var(--accent)';
+            e.target.style.color = 'white';
+            e.target.style.border = 'none';
+
+            const tabBlocks = document.getElementById('tab-blocks');
+            tabBlocks.style.background = 'var(--surface)';
+            tabBlocks.style.color = 'var(--primary)';
+            tabBlocks.style.border = '1px solid var(--border)';
+
+            document.getElementById('library-blocks-container').style.display = 'none';
+            document.getElementById('library-songs-container').style.display = 'block';
+            renderSongsList();
+        });
+
+        function toggleSongEditor(show) {
+            const editor = document.getElementById('song-editor-view');
+            if (show) {
+                mainSections().forEach(sec => sec.style.display = 'none');
+                editor.style.display = 'block';
+
+                const select = document.getElementById('song-block-select');
+                select.innerHTML = '';
+                const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+                if (savedBlocks.length === 0) {
+                    select.innerHTML = '<option value="">No blocks saved</option>';
+                } else {
+                    savedBlocks.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        opt.innerText = b.name;
+                        select.appendChild(opt);
+                    });
+                }
+            } else {
+                editor.style.display = 'none';
+                mainSections().forEach(sec => sec.style.display = 'block');
+            }
+        }
+
+        document.getElementById('create-song-btn').addEventListener('click', () => {
+            currentSongDraft = [];
+            currentEditingSongId = null;
+            document.getElementById('song-name-input').value = '';
+            renderSongDraftList();
+            toggleLibrary(false);
+            toggleSongEditor(true);
+        });
+
+        document.getElementById('cancel-song-btn').addEventListener('click', () => {
+            toggleSongEditor(false);
+            toggleLibrary(true);
+            document.getElementById('tab-songs').click();
+        });
+
+        document.getElementById('add-block-to-song-btn').addEventListener('click', () => {
+            const select = document.getElementById('song-block-select');
+            if (select.value) {
+                currentSongDraft.push(parseInt(select.value));
+                renderSongDraftList();
+            }
+        });
+
+        function renderSongDraftList() {
+            const list = document.getElementById('song-draft-list');
+            list.innerHTML = '';
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+
+            currentSongDraft.forEach((blockId, index) => {
+                const block = savedBlocks.find(b => b.id === blockId);
+                const blockName = block ? block.name : 'Deleted Block';
+
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px;';
+
+                const textDiv = document.createElement('div');
+                textDiv.innerHTML = `<strong>${index + 1}. ${blockName}</strong>`;
+
+                const controlsDiv = document.createElement('div');
+                controlsDiv.style.cssText = 'display: flex; gap: 6px;';
+
+                if (index > 0) {
+                    const upBtn = document.createElement('button');
+                    upBtn.innerText = 'Up';
+                    upBtn.style.cssText = 'padding: 4px 10px; font-size: 14px; background: transparent; color: var(--primary); border: 1px solid var(--border); border-radius: 4px;';
+                    upBtn.onclick = () => {
+                        [currentSongDraft[index - 1], currentSongDraft[index]] = [currentSongDraft[index], currentSongDraft[index - 1]];
+                        renderSongDraftList();
+                    };
+                    controlsDiv.appendChild(upBtn);
+                }
+
+                if (index < currentSongDraft.length - 1) {
+                    const downBtn = document.createElement('button');
+                    downBtn.innerText = 'Down';
+                    downBtn.style.cssText = 'padding: 4px 10px; font-size: 14px; background: transparent; color: var(--primary); border: 1px solid var(--border); border-radius: 4px;';
+                    downBtn.onclick = () => {
+                        [currentSongDraft[index], currentSongDraft[index + 1]] = [currentSongDraft[index + 1], currentSongDraft[index]];
+                        renderSongDraftList();
+                    };
+                    controlsDiv.appendChild(downBtn);
+                }
+
+                const delBtn = document.createElement('button');
+                delBtn.innerText = 'Remove';
+                delBtn.style.cssText = 'padding: 4px 10px; font-size: 14px; background: transparent; color: #ff5555; border: 1px solid var(--border); border-radius: 4px;';
+                delBtn.onclick = () => {
+                    currentSongDraft.splice(index, 1);
+                    renderSongDraftList();
+                };
+                controlsDiv.appendChild(delBtn);
+
+                item.appendChild(textDiv);
+                item.appendChild(controlsDiv);
+                list.appendChild(item);
+            });
+        }
+
+        document.getElementById('save-song-btn').addEventListener('click', () => {
+            const name = document.getElementById('song-name-input').value.trim();
+            if (!name) return alert("Please enter a song name.");
+            if (currentSongDraft.length === 0) return alert("Add at least one block to your song.");
+
+            const savedSongs = JSON.parse(localStorage.getItem('chordSongs') || '[]');
+
+            if (currentEditingSongId) {
+                const idx = savedSongs.findIndex(s => s.id === currentEditingSongId);
+                if (idx > -1) {
+                    savedSongs[idx].name = name;
+                    savedSongs[idx].blocks = currentSongDraft;
+                } else {
+                    savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft });
+                }
+            } else {
+                savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft });
+            }
+
+            localStorage.setItem('chordSongs', JSON.stringify(savedSongs));
+            toggleSongEditor(false);
+            toggleLibrary(true);
+            document.getElementById('tab-songs').click();
+        });
+
+        function renderSongsList() {
+            const list = document.getElementById('library-songs-list');
+            list.innerHTML = '';
+            const savedSongs = JSON.parse(localStorage.getItem('chordSongs') || '[]');
+
+            if (savedSongs.length === 0) {
+                list.innerHTML = '<p style="color: var(--primary); opacity: 0.7; text-align: center; margin-top: 40px;">No songs saved yet.</p>';
+                return;
+            }
+
+            savedSongs.forEach(song => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;';
+
+                const header = document.createElement('div');
+                header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
+                header.innerHTML = `<strong>${song.name}</strong> <span style="font-size: 14px; opacity: 0.8;">${song.blocks.length} blocks</span>`;
+
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display: flex; gap: 8px; justify-content: space-between;';
+
+                const playBtn = document.createElement('button');
+                playBtn.innerText = 'Play';
+                playBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
+                playBtn.onclick = () => {
+                    renderPerformance(song.id, 'song');
+                    togglePerformance(true);
+                };
+
+                const editBtn = document.createElement('button');
+                editBtn.innerText = 'Edit';
+                editBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
+                editBtn.onclick = () => {
+                    currentSongDraft = [...song.blocks];
+                    currentEditingSongId = song.id;
+                    document.getElementById('song-name-input').value = song.name;
+                    renderSongDraftList();
+                    toggleLibrary(false);
+                    toggleSongEditor(true);
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.innerText = 'Delete';
+                delBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px; background: transparent; color: #ffcc00; border-color: #ffcc00;';
+                delBtn.onclick = () => {
+                    if (confirm(`Delete song "${song.name}"?`)) {
+                        const updated = savedSongs.filter(s => s.id !== song.id);
+                        localStorage.setItem('chordSongs', JSON.stringify(updated));
+                        renderSongsList();
+                    }
+                };
+
+                actions.appendChild(playBtn);
+                actions.appendChild(editBtn);
+                actions.appendChild(delBtn);
+                item.appendChild(header);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        }
+
         // --- PERFORMANCE LOGIC ---
-        let currentPerformanceBlockId = null;
+        let currentPerformanceId = null;
+        let currentPerformanceType = 'block';
 
         function togglePerformance(show) {
             const perfView = document.getElementById('performance-view');
             const libraryView = document.getElementById('library-view');
 
             if (show) {
-                libraryView.style.display = 'none'; // Hide library
-                perfView.style.display = 'block';   // Show performance view
+                libraryView.style.display = 'none';
+                perfView.style.display = 'block';
             } else {
                 perfView.style.display = 'none';
-                libraryView.style.display = 'block'; // Go back to library
+                libraryView.style.display = 'block';
             }
         }
 
         document.getElementById('close-performance-btn').addEventListener('click', () => togglePerformance(false));
 
-        function renderPerformance(blockId) {
-            currentPerformanceBlockId = blockId; // Save state
-            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
-            const block = savedBlocks.find(b => b.id === blockId);
-            if (!block) return;
+        function renderPerformance(id, type = 'block') {
+            currentPerformanceId = id;
+            currentPerformanceType = type;
 
-            document.getElementById('performance-title').innerText = block.name;
             const grid = document.getElementById('performance-grid');
-            grid.innerHTML = ''; // Clear previous charts
+            grid.innerHTML = '';
 
+            let titleText = '';
+            let sectionsToRender = [];
+
+            if (type === 'block') {
+                const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+                const block = savedBlocks.find(b => b.id === id);
+                if (!block) return;
+                titleText = block.name;
+                sectionsToRender.push({ title: null, chords: block.chords });
+            } else if (type === 'song') {
+                const savedSongs = JSON.parse(localStorage.getItem('chordSongs') || '[]');
+                const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+                const song = savedSongs.find(s => s.id === id);
+                if (!song) return;
+                titleText = song.name;
+
+                song.blocks.forEach(blockId => {
+                    const block = savedBlocks.find(b => b.id === blockId);
+                    if (block) {
+                        sectionsToRender.push({ title: block.name, chords: block.chords });
+                    }
+                });
+            }
+
+            document.getElementById('performance-title').innerText = titleText;
             const currentThemeColor = getComputedStyle(document.body).getPropertyValue('--primary').trim();
 
-            block.chords.forEach((chord) => {
-                // Create a wrapper for the whole item (title + chart)
-                const itemWrapper = document.createElement('div');
-                itemWrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 150px; gap: 5px;';
+            sectionsToRender.forEach(section => {
+                if (section.title) {
+                    const header = document.createElement('div');
+                    header.style.cssText = 'grid-column: 1 / -1; font-weight: bold; font-size: 18px; color: var(--accent); padding-top: 15px; padding-bottom: 5px; border-bottom: 1px solid var(--border); text-align: left; margin-bottom: 10px; width: 100%;';
+                    header.innerText = section.title;
+                    grid.appendChild(header);
+                }
 
-                // Create a standard HTML title so it never overlaps the drawing
-                const titleLabel = document.createElement('div');
-                titleLabel.style.cssText = 'font-weight: bold; font-size: 16px; text-align: center;';
-                const displayVariant = chord.variant === 'major' ? '' : chord.variant;
-                titleLabel.innerText = `${chord.root} ${displayVariant}`.trim();
+                section.chords.forEach((chord) => {
+                    const itemWrapper = document.createElement('div');
+                    itemWrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 150px; gap: 5px;';
 
-                // Create the container strictly for the SVG drawing
-                const chartDiv = document.createElement('div');
-                chartDiv.style.cssText = 'width: 100%; height: 160px;';
+                    const titleLabel = document.createElement('div');
+                    titleLabel.style.cssText = 'font-weight: bold; font-size: 16px; text-align: center;';
+                    const displayVariant = chord.variant === 'major' ? '' : chord.variant;
+                    titleLabel.innerText = `${chord.root} ${displayVariant}`.trim();
 
-                itemWrapper.appendChild(titleLabel);
-                itemWrapper.appendChild(chartDiv);
-                grid.appendChild(itemWrapper);
+                    const chartDiv = document.createElement('div');
+                    chartDiv.style.cssText = 'width: 100%; height: 160px;';
 
-                // Use svGuitar to draw directly into the inner chartDiv, without a title
-                const miniChart = new window.svguitar.SVGuitarChord(chartDiv);
-                miniChart.chord({
-                    fingers: chord.fingers,
-                    barres: [],
-                    position: chord.baseFret
-                })
-                    .configure({
-                        color: currentThemeColor,
-                        nutColor: currentThemeColor,
-                        stringColor: currentThemeColor,
-                        fretColor: currentThemeColor
-                        // Title intentionally omitted to prevent overlapping
+                    itemWrapper.appendChild(titleLabel);
+                    itemWrapper.appendChild(chartDiv);
+                    grid.appendChild(itemWrapper);
+
+                    const miniChart = new window.svguitar.SVGuitarChord(chartDiv);
+                    miniChart.chord({
+                        fingers: chord.fingers,
+                        barres: [],
+                        position: chord.baseFret
                     })
-                    .draw();
+                        .configure({
+                            color: currentThemeColor,
+                            nutColor: currentThemeColor,
+                            stringColor: currentThemeColor,
+                            fretColor: currentThemeColor
+                        })
+                        .draw();
+                });
             });
         }
 
