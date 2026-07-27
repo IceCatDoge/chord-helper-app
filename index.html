@@ -39,6 +39,51 @@
             --border: #000000;
         }
 
+        /* LYRICS STUDIO STYLES */
+        .lyric-line {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            align-items: flex-end;
+        }
+
+        .chord-pair {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .chord-label {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: -2px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            z-index: 1;
+        }
+
+            .chord-label.verified {
+                color: var(--accent);
+            }
+
+            .chord-label.missing {
+                color: #e74c3c;
+                cursor: pointer;
+                border: 1px dashed #e74c3c;
+                background: rgba(231, 76, 60, 0.1);
+                transition: background 0.2s;
+            }
+
+                .chord-label.missing:hover {
+                    background: #e74c3c;
+                    color: white;
+                }
+
+        .lyric-text {
+            font-size: 16px;
+            white-space: pre; /* Preserves the exact spaces typed */
+        }
+
         /* STRUCTURAL STYLES */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -267,7 +312,10 @@
         <div class="header-row" style="margin-bottom: 20px;">
             <button id="cancel-song-btn" style="padding: 6px 12px; font-size: 14px;">Cancel</button>
             <h2 style="margin: 0; font-size: 18px;">Song Assembler</h2>
-            <button id="save-song-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">Save</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="open-lyrics-btn" style="background-color: transparent; color: var(--accent); border-color: var(--accent); padding: 6px 12px; font-size: 14px;">Lyrics</button>
+                <button id="save-song-btn" style="background-color: var(--accent); color: white; padding: 6px 12px; font-size: 14px;">Save</button>
+            </div>
         </div>
         <input type="text" id="song-name-input" placeholder="Song Name (e.g. Wonderwall)" style="width: 100%; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; padding: 10px; border-radius: 6px; border: 2px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
 
@@ -277,6 +325,26 @@
         </div>
 
         <div id="song-draft-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;"></div>
+    </div>
+
+    <!-- LYRICS STUDIO VIEW (Hidden by default) -->
+    <div id="lyrics-studio-view" class="section" style="display: none; min-height: 400px; text-align: left;">
+        <div class="header-row" style="margin-bottom: 20px;">
+            <button id="close-lyrics-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Back to Song</button>
+            <h2 style="margin: 0; font-size: 18px;">Lyrics Studio</h2>
+            <button id="export-lyrics-txt-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--primary); color: var(--primary);">Export TXT</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button id="tab-napkin" class="active" style="flex: 1; padding: 8px; font-size: 14px; background: var(--accent); color: white; border: none;">The Napkin (Draft)</button>
+            <button id="tab-studio" style="flex: 1; padding: 8px; font-size: 14px; background: var(--surface); color: var(--primary); border: 1px solid var(--border);">The Studio (Render)</button>
+        </div>
+
+        <!-- The Napkin (Raw Text) -->
+        <textarea id="lyric-textarea" placeholder="Type lyrics here... use brackets for chords!\n\nExample:\n[G]Hello dark[D]ness my old [Em]friend" style="width: 100%; height: 350px; box-sizing: border-box; padding: 15px; font-family: monospace; font-size: 16px; border-radius: 6px; border: 2px solid var(--border); background: var(--bg); color: var(--primary); outline: none; resize: vertical;"></textarea>
+
+        <!-- The Studio (Rendered Output) -->
+        <div id="lyric-render-area" style="display: none; width: 100%; min-height: 350px; box-sizing: border-box; padding: 15px; border-radius: 6px; border: 2px solid var(--border); background: var(--bg); color: var(--primary);"></div>
     </div>
 
     <!-- PERFORMANCE VIEW (Hidden by default) -->
@@ -1094,6 +1162,9 @@
             if (!name) return alert("Please enter a song name.");
             if (currentSongDraft.length === 0) return alert("Add at least one block to your song.");
 
+            // Pull the latest lyrics just in case they didn't exit the menu safely
+            currentSongLyrics = document.getElementById('lyric-textarea').value;
+
             const savedSongs = JSON.parse(localStorage.getItem('chordSongs') || '[]');
 
             if (currentEditingSongId) {
@@ -1101,11 +1172,12 @@
                 if (idx > -1) {
                     savedSongs[idx].name = name;
                     savedSongs[idx].blocks = currentSongDraft;
+                    savedSongs[idx].lyrics = currentSongLyrics; // <-- NEW
                 } else {
-                    savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft });
+                    savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft, lyrics: currentSongLyrics });
                 }
             } else {
-                savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft });
+                savedSongs.push({ id: Date.now(), name: name, blocks: currentSongDraft, lyrics: currentSongLyrics });
             }
 
             localStorage.setItem('chordSongs', JSON.stringify(savedSongs));
@@ -1150,6 +1222,8 @@
                     currentSongDraft = [...song.blocks];
                     currentEditingSongId = song.id;
                     document.getElementById('song-name-input').value = song.name;
+                    currentSongLyrics = song.lyrics || "";
+                    document.getElementById('lyric-textarea').value = currentSongLyrics;
                     renderSongDraftList();
                     toggleLibrary(false);
                     toggleSongEditor(true);
@@ -1174,6 +1248,199 @@
                 list.appendChild(item);
             });
         }
+
+        // --- LYRICS STUDIO LOGIC ---
+        let currentSongLyrics = "";
+
+        // UI Toggles
+        document.getElementById('open-lyrics-btn').addEventListener('click', () => {
+            document.getElementById('song-editor-view').style.display = 'none';
+            document.getElementById('lyrics-studio-view').style.display = 'block';
+            document.getElementById('lyric-textarea').value = currentSongLyrics;
+            document.getElementById('tab-napkin').click();
+        });
+
+        document.getElementById('close-lyrics-btn').addEventListener('click', () => {
+            currentSongLyrics = document.getElementById('lyric-textarea').value; // Save state on exit
+            document.getElementById('lyrics-studio-view').style.display = 'none';
+            document.getElementById('song-editor-view').style.display = 'block';
+        });
+
+        document.getElementById('tab-napkin').addEventListener('click', (e) => {
+            e.target.style.background = 'var(--accent)'; e.target.style.color = 'white'; e.target.style.border = 'none';
+            const tabStudio = document.getElementById('tab-studio');
+            tabStudio.style.background = 'var(--surface)'; tabStudio.style.color = 'var(--primary)'; tabStudio.style.border = '1px solid var(--border)';
+
+            document.getElementById('lyric-textarea').style.display = 'block';
+            document.getElementById('lyric-render-area').style.display = 'none';
+        });
+
+        document.getElementById('tab-studio').addEventListener('click', (e) => {
+            e.target.style.background = 'var(--accent)'; e.target.style.color = 'white'; e.target.style.border = 'none';
+            const tabNapkin = document.getElementById('tab-napkin');
+            tabNapkin.style.background = 'var(--surface)'; tabNapkin.style.color = 'var(--primary)'; tabNapkin.style.border = '1px solid var(--border)';
+
+            currentSongLyrics = document.getElementById('lyric-textarea').value;
+            document.getElementById('lyric-textarea').style.display = 'none';
+            document.getElementById('lyric-render-area').style.display = 'block';
+            renderStudioLyrics(currentSongLyrics);
+        });
+
+        // The Parser
+        function renderStudioLyrics(rawText) {
+            const container = document.getElementById('lyric-render-area');
+            container.innerHTML = '';
+
+            // Gather all chords currently in the song sequence for validation
+            const activeRoots = new Set();
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+            currentSongDraft.forEach(blockId => {
+                const block = savedBlocks.find(b => b.id === blockId);
+                if (block) {
+                    block.chords.forEach(c => {
+                        const displayVariant = c.variant === 'major' ? '' : c.variant;
+                        activeRoots.add(`${c.root} ${displayVariant}`.trim());
+                    });
+                }
+            });
+
+            const lines = rawText.split('\n');
+            lines.forEach(line => {
+                if (line.trim() === '') {
+                    container.appendChild(document.createElement('br'));
+                    return;
+                }
+
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'lyric-line';
+
+                // Split by brackets
+                let segments = line.split(/\[(.*?)\]/g);
+
+                // Text before the first chord
+                if (segments[0] !== '') {
+                    const pair = document.createElement('span');
+                    pair.className = 'chord-pair';
+                    pair.innerHTML = `<span class="chord-label" style="opacity:0; user-select:none;">_</span><span class="lyric-text">${segments[0]}</span>`;
+                    lineDiv.appendChild(pair);
+                }
+
+                for (let i = 1; i < segments.length; i += 2) {
+                    const chordName = segments[i].trim();
+                    const lyricText = segments[i + 1] || '';
+
+                    const pair = document.createElement('span');
+                    pair.className = 'chord-pair';
+
+                    const isVerified = activeRoots.has(chordName);
+                    const statusClass = isVerified ? 'verified' : 'missing';
+                    const titleAttr = isVerified ? '' : `title="Click to auto-generate block for ${chordName}"`;
+
+                    pair.innerHTML = `
+                        <span class="chord-label ${statusClass}" ${titleAttr} ${!isVerified ? `onclick="quickAddMissingChord('${chordName}')"` : ''}>${chordName}</span>
+                        <span class="lyric-text">${lyricText}</span>
+                    `;
+                    lineDiv.appendChild(pair);
+                }
+                container.appendChild(lineDiv);
+            });
+        }
+
+        // The Quick-Add Engine
+        window.quickAddMissingChord = function (chordStr) {
+            // Attempt to parse what the user typed (e.g. "F# m7" -> root: "F#", variant: "m7")
+            const rootMatch = chordStr.match(/^[A-G][#b]?/);
+            if (!rootMatch) return alert("Could not understand root note. Please use standard letters (A-G).");
+
+            const root = rootMatch[0];
+            let variant = chordStr.slice(root.length).trim();
+            if (variant === '' || variant.toLowerCase() === 'm') variant = variant.toLowerCase() === 'm' ? 'minor' : 'major';
+
+            // Verify it exists in our database
+            if (!chordDB[root] || !chordDB[root][variant]) {
+                return alert(`Sorry, "${root} ${variant}" is not in the database yet!`);
+            }
+
+            // Create a dedicated block for this missing chord
+            const targetPos = chordDB[root][variant][0];
+            const parsedShape = parseChordString(targetPos.frets);
+
+            const quickBlock = {
+                id: Date.now(),
+                name: `[Auto] ${chordStr}`,
+                chords: [{
+                    root: root,
+                    displayRoot: root,
+                    variant: variant,
+                    positionIndex: 0,
+                    fingers: parsedShape.fingers,
+                    baseFret: targetPos.baseFret || 1,
+                    capo: 0,
+                    beats: 4
+                }]
+            };
+
+            // Save to LocalStorage instantly
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+            savedBlocks.push(quickBlock);
+            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
+
+            // Inject directly into current song and re-render
+            currentSongDraft.push(quickBlock.id);
+            renderSongDraftList();
+            renderStudioLyrics(currentSongLyrics);
+        };
+
+        // The Plain-Text Translator (Exporter)
+        document.getElementById('export-lyrics-txt-btn').addEventListener('click', () => {
+            let rawText = document.getElementById('lyric-textarea').value;
+            if (!rawText.trim()) return alert("No lyrics to export!");
+
+            let outText = '';
+            const lines = rawText.split('\n');
+
+            lines.forEach(line => {
+                if (line.trim() === '') { outText += '\n'; return; }
+
+                let chordLine = '';
+                let lyricLine = '';
+                let segments = line.split(/\[(.*?)\]/g);
+
+                if (segments[0]) {
+                    lyricLine += segments[0];
+                    chordLine += ' '.repeat(segments[0].length);
+                }
+
+                for (let i = 1; i < segments.length; i += 2) {
+                    const chord = segments[i];
+                    const text = segments[i + 1] || '';
+
+                    chordLine += chord;
+                    lyricLine += text;
+
+                    const diff = text.length - chord.length;
+                    if (diff > 0) {
+                        chordLine += ' '.repeat(diff);
+                    } else if (diff < 0) {
+                        // Text is shorter than chord, pad the lyric line to keep things aligned
+                        lyricLine += ' '.repeat(Math.abs(diff) + 1);
+                        chordLine += ' ';
+                    }
+                }
+                outText += chordLine.trimEnd() + '\n' + lyricLine.trimEnd() + '\n';
+            });
+
+            // Create downloadable file
+            const blob = new Blob([outText], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${document.getElementById('song-name-input').value || 'Song_Lyrics'}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
 
         // --- PERFORMANCE LOGIC ---
         let currentPerformanceId = null;
