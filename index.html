@@ -141,6 +141,16 @@
         <h1 style="margin: 0;">Chord Helper</h1>
         <div style="display: flex; gap: 10px; align-items: center;">
             <button id="open-library-btn" style="padding: 6px 12px; font-size: 14px;">Library</button>
+            <select id="capo-selector" style="padding: 6px 10px; font-size: 14px; border-radius: 6px; border: 2px solid var(--accent); background: var(--surface); color: var(--primary);">
+                <option value="0">No Capo</option>
+                <option value="1">Capo 1</option>
+                <option value="2">Capo 2</option>
+                <option value="3">Capo 3</option>
+                <option value="4">Capo 4</option>
+                <option value="5">Capo 5</option>
+                <option value="6">Capo 6</option>
+                <option value="7">Capo 7</option>
+            </select>
             <select id="theme-selector">
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
@@ -187,9 +197,17 @@
             <button id="next-pos">&gt;</button>
         </div>
 
-        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-            <button id="strum-btn" style="width: 160px; display: none;">Strum</button>
-            <button id="add-chord-btn" style="width: 160px; display: none;">➕ Add to Block</button>
+        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button id="strum-btn" style="width: 120px; display: none;">Strum</button>
+            <select id="chord-duration-select" style="display: none; padding: 6px; border-radius: 4px; border: 2px solid var(--accent); background: var(--surface); color: var(--primary); font-weight: bold;">
+                <option value="1">1 Beat</option>
+                <option value="2">2 Beats</option>
+                <option value="3">3 Beats</option>
+                <option value="4" selected>4 Beats</option>
+                <option value="6">6 Beats</option>
+                <option value="8">8 Beats</option>
+            </select>
+            <button id="add-chord-btn" style="width: 140px; display: none;">➕ Add to Block</button>
         </div>
     </div>
 
@@ -262,12 +280,35 @@
     </div>
 
     <!-- PERFORMANCE VIEW (Hidden by default) -->
-    <div id="performance-view" class="section" style="display: none; min-height: 400px; text-align: left;">
+    <div id="performance-view" class="section" style="display: none; min-height: 400px; text-align: left; position: relative;">
         <div class="header-row" style="margin-bottom: 20px;">
             <button id="close-performance-btn" style="padding: 6px 12px; font-size: 14px;">⬅ Library</button>
             <h2 id="performance-title" style="margin: 0; font-size: 18px;">Live View</h2>
             <div style="width: 85px;"></div>
         </div>
+
+        <!-- AUTOPLAY CONTROL BAR -->
+        <div id="autoplay-controls" style="display: flex; gap: 10px; justify-content: center; align-items: center; padding: 12px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 14px; font-weight: bold;">BPM:</label>
+                <input type="number" id="tempo-input" value="120" min="40" max="240" style="width: 60px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 14px; font-weight: bold;">Beat:</label>
+                <select id="time-sig-select" style="padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+                    <option value="4">4/4</option>
+                    <option value="3">3/4</option>
+                    <option value="6">6/8</option>
+                </select>
+            </div>
+            <button id="toggle-audio-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--border); color: var(--primary); border-radius: 4px;">Metronome: OFF</button>
+            <button id="toggle-strum-audio-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--border); color: var(--primary); border-radius: 4px;">Strum: OFF</button>
+            <button id="play-pause-btn" style="padding: 6px 20px; font-size: 14px; background: var(--accent); color: white; border: none; border-radius: 4px; font-weight: bold;">Play</button>
+            <button id="reset-focus-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--border); color: var(--primary); border-radius: 4px;">Reset</button>
+        </div>
+
+        <p style="text-align: center; font-size: 14px; opacity: 0.8; margin-top: 0; margin-bottom: 20px; pointer-events: none;">Tap anywhere in the background to advance focus manually.</p>
+
         <!-- Horizontal Grid Container -->
         <div id="performance-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; justify-items: center;">
             <!-- Chords injected here -->
@@ -362,19 +403,30 @@
         }
 
         function updateRootSelection() {
-            let target = selectedBaseRoot + selectedAccidental;
+            let targetPitch = selectedBaseRoot + selectedAccidental;
+
             // Map common enharmonics to what the database actually uses
             const enharmonics = { 'A#': 'Bb', 'Bb': 'A#', 'C#': 'Db', 'Db': 'C#', 'D#': 'Eb', 'Eb': 'D#', 'E#': 'F', 'Fb': 'E', 'F#': 'Gb', 'Gb': 'F#', 'G#': 'Ab', 'Ab': 'G#', 'B#': 'C', 'Cb': 'B' };
 
-            if (chordDB[target]) {
-                currentRoot = target;
-            } else if (enharmonics[target] && chordDB[enharmonics[target]]) {
-                currentRoot = enharmonics[target];
-            } else {
-                currentRoot = target; // Fallback, will show "Not in database"
+            // 1. Transpose the target pitch down by the capo fret to find the physical SHAPE needed
+            let shapeTarget = targetPitch;
+            if (currentCapo > 0) {
+                shapeTarget = transposeNote(targetPitch, -currentCapo);
             }
 
+            // 2. Resolve enharmonics for the database lookup
+            if (chordDB[shapeTarget]) {
+                currentRoot = shapeTarget;
+            } else if (enharmonics[shapeTarget] && chordDB[enharmonics[shapeTarget]]) {
+                currentRoot = enharmonics[shapeTarget];
+            } else {
+                currentRoot = shapeTarget; // Fallback, will show "Not in database"
+            }
+
+            // 3. Save the active shape for drafting/display purposes
+            activeShapeRoot = currentRoot;
             currentPosIndex = 0;
+
             updateVariantList(currentRoot);
             renderChord();
         }
@@ -422,6 +474,23 @@
         let currentPosIndex = 0;
         let activeChordData = null;
 
+        // Capo State Variables
+        let currentCapo = 0;
+        let activeShapeRoot = 'A';
+
+        // Chromatic math engine for transposing shapes
+        const chromaticMap = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        function transposeNote(note, semitones) {
+            const enharmonics = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+            let n = enharmonics[note] || note;
+            let idx = chromaticMap.indexOf(n);
+            if (idx === -1) return note; // Fallback if format is unexpected
+
+            let newIdx = (idx + semitones) % 12;
+            if (newIdx < 0) newIdx += 12; // Handle negative wrapping
+            return chromaticMap[newIdx];
+        }
+
         function initChart() {
             document.getElementById('chord-diagram').innerHTML = '';
             chart = new window.svguitar.SVGuitarChord('#chord-diagram');
@@ -446,9 +515,14 @@
 
                 const currentThemeColor = getComputedStyle(document.body).getPropertyValue('--primary').trim();
 
-                // Update the decoupled HTML title (major is blank for standard notation)
+                // Update the decoupled HTML title to reflect the Capo accurately
                 const displayVariant = currentVariant === 'major' ? '' : currentVariant;
-                document.getElementById('main-chord-title').innerText = `${currentRoot} ${displayVariant}`.trim();
+                let titleText = `${selectedBaseRoot}${selectedAccidental} ${displayVariant}`.trim();
+
+                if (currentCapo > 0) {
+                    titleText += ` (Play ${activeShapeRoot} shape)`;
+                }
+                document.getElementById('main-chord-title').innerText = titleText;
 
                 chart.chord({
                     fingers: activeChordData.fingers,
@@ -466,6 +540,7 @@
 
                 strumBtn.style.display = 'inline-block';
                 document.getElementById('add-chord-btn').style.display = 'inline-block';
+                document.getElementById('chord-duration-select').style.display = 'inline-block';
 
                 if (positions.length > 1) {
                     posControls.style.display = 'flex';
@@ -482,6 +557,7 @@
                 strumBtn.style.display = 'none';
                 posControls.style.display = 'none';
                 document.getElementById('add-chord-btn').style.display = 'none';
+                document.getElementById('chord-duration-select').style.display = 'none';
             }
         }
 
@@ -501,6 +577,11 @@
             }
         });
 
+        document.getElementById('capo-selector').addEventListener('change', (e) => {
+            currentCapo = parseInt(e.target.value, 10);
+            updateRootSelection();
+        });
+
         variantInput.addEventListener('change', (e) => {
             let val = e.target.value.trim();
             if (val === '') val = 'major';
@@ -518,13 +599,19 @@
         document.getElementById('add-chord-btn').addEventListener('click', () => {
             if (!activeChordData) return;
 
-            // Save current chord's state
+            const selectedBeats = parseInt(document.getElementById('chord-duration-select').value) || 4;
+            const targetPitch = selectedBaseRoot + selectedAccidental; // Get the absolute pitch
+
+            // Save the exact state, including shape, capo, and duration metadata
             currentBlockDraft.push({
-                root: currentRoot,
+                root: targetPitch,           // <-- Changed from currentRoot
+                displayRoot: activeShapeRoot,
                 variant: currentVariant,
                 positionIndex: currentPosIndex,
                 fingers: activeChordData.fingers,
-                baseFret: chordDB[currentRoot][currentVariant][currentPosIndex].baseFret
+                baseFret: activeChordData.baseFret,
+                capo: currentCapo,
+                beats: selectedBeats
             });
 
             // Visual feedback to user
@@ -596,18 +683,16 @@
             btn.classList.add('active');
         }
 
-        document.getElementById('strum-btn').addEventListener('click', () => {
-            if (!activeChordData) return;
+        function playStrum(fingers, baseFret, capo) {
             initAudio();
             const now = audioCtx.currentTime;
             let delay = 0;
-            const sortedFingers = [...activeChordData.fingers].sort((a, b) => b[0] - a[0]);
-            const baseFret = activeChordData.baseFret || 1;
+            const sortedFingers = [...fingers].sort((a, b) => b[0] - a[0]);
+            const bFret = baseFret || 1;
 
             sortedFingers.forEach(([string, fret]) => {
                 if (fret !== 'x') {
-                    // Open strings (0) stay 0. Fretted notes shift up based on the position.
-                    const absoluteFret = fret === 0 ? 0 : (baseFret + fret - 1);
+                    const absoluteFret = fret === 0 ? capo : (bFret + fret - 1 + capo);
                     const freq = openStrings[string] * Math.pow(2, absoluteFret / 12);
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
@@ -620,6 +705,11 @@
                     delay += 0.04;
                 }
             });
+        }
+
+        document.getElementById('strum-btn').addEventListener('click', () => {
+            if (!activeChordData) return;
+            playStrum(activeChordData.fingers, activeChordData.baseFret, currentCapo);
         });
 
         // --- THEMES ---
@@ -665,10 +755,12 @@
                 item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px; margin-bottom: 8px;';
 
                 const displayVariant = chord.variant === 'major' ? '' : chord.variant;
+                const capoBadge = chord.capo > 0 ? `<span style="color: var(--accent); font-size: 14px; margin-left: 6px;">(Capo ${chord.capo})</span>` : '';
+                const beatBadge = chord.beats ? `<span style="font-size: 14px; background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">${chord.beats} Beats</span>` : '';
 
                 // Text container
                 const textDiv = document.createElement('div');
-                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong> <span style="font-size: 14px; opacity: 0.8; margin-left: 8px;">Pos ${chord.positionIndex + 1}</span>`;
+                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatBadge} <span style="font-size: 14px; opacity: 0.8; margin-left: 8px;">Pos ${chord.positionIndex + 1}</span>`;
 
                 // Controls container
                 const controlsDiv = document.createElement('div');
@@ -1087,6 +1179,54 @@
         let currentPerformanceId = null;
         let currentPerformanceType = 'block';
 
+        // Autoplay & Focus State
+        let focusNodes = [];
+        let currentFocusIndex = -1;
+
+        function updateFocusVisuals() {
+            focusNodes.forEach((node, idx) => {
+                if (idx === currentFocusIndex) {
+                    node.style.borderColor = 'var(--accent)';
+                    node.style.backgroundColor = 'var(--surface)';
+                    node.style.transform = 'scale(1.05)';
+                    node.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+
+                    // Smoothly auto-scroll so the active chord is always centered on screen
+                    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    node.style.borderColor = 'transparent';
+                    node.style.backgroundColor = 'transparent';
+                    node.style.transform = 'scale(1)';
+                    node.style.boxShadow = 'none';
+                }
+            });
+        }
+
+        function advanceFocus() {
+            if (focusNodes.length === 0) return;
+            currentFocusIndex++;
+            if (currentFocusIndex >= focusNodes.length) {
+                currentFocusIndex = 0; // Loop back to the start
+            }
+            updateFocusVisuals();
+        }
+
+        // The global tap-to-advance listener
+        document.getElementById('performance-view').addEventListener('click', (e) => {
+            // Ignore clicks if they happen on the control bar or header buttons
+            if (e.target.closest('#autoplay-controls') || e.target.closest('.header-row')) {
+                return;
+            }
+            advanceFocus();
+        });
+
+        document.getElementById('reset-focus-btn').addEventListener('click', () => {
+            currentFocusIndex = -1;
+            currentBeat = 0;
+            updateFocusVisuals();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
         function togglePerformance(show) {
             const perfView = document.getElementById('performance-view');
             const libraryView = document.getElementById('library-view');
@@ -1100,7 +1240,12 @@
             }
         }
 
-        document.getElementById('close-performance-btn').addEventListener('click', () => togglePerformance(false));
+        document.getElementById('close-performance-btn').addEventListener('click', () => {
+            if (isAutoplaying) {
+                document.getElementById('play-pause-btn').click(); // Cleanly shut down the loop
+            }
+            togglePerformance(false);
+        });
 
         function renderPerformance(id, type = 'block') {
             currentPerformanceId = id;
@@ -1136,6 +1281,10 @@
             document.getElementById('performance-title').innerText = titleText;
             const currentThemeColor = getComputedStyle(document.body).getPropertyValue('--primary').trim();
 
+            focusNodes = [];
+            flatPerformanceChords = []; // Tracks actual data for Auto-Strum and Beat length
+            currentFocusIndex = -1;
+
             sectionsToRender.forEach(section => {
                 if (section.title) {
                     const header = document.createElement('div');
@@ -1146,12 +1295,20 @@
 
                 section.chords.forEach((chord) => {
                     const itemWrapper = document.createElement('div');
-                    itemWrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 150px; gap: 5px;';
+                    itemWrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 150px; gap: 5px; padding: 10px; border: 2px solid transparent; border-radius: 8px; transition: all 0.2s ease-in-out; cursor: pointer;';
+
+                    focusNodes.push(itemWrapper);
+                    flatPerformanceChords.push(chord); // Save for playback referencing
 
                     const titleLabel = document.createElement('div');
                     titleLabel.style.cssText = 'font-weight: bold; font-size: 16px; text-align: center;';
                     const displayVariant = chord.variant === 'major' ? '' : chord.variant;
-                    titleLabel.innerText = `${chord.root} ${displayVariant}`.trim();
+
+                    if (chord.capo > 0) {
+                        titleLabel.innerHTML = `${chord.root} ${displayVariant}<br><span style="font-size: 13px; font-weight: normal; color: var(--accent);">Capo ${chord.capo} (Play ${chord.displayRoot})</span>`;
+                    } else {
+                        titleLabel.innerText = `${chord.root} ${displayVariant}`.trim();
+                    }
 
                     const chartDiv = document.createElement('div');
                     chartDiv.style.cssText = 'width: 100%; height: 160px;';
@@ -1161,21 +1318,151 @@
                     grid.appendChild(itemWrapper);
 
                     const miniChart = new window.svguitar.SVGuitarChord(chartDiv);
-                    miniChart.chord({
-                        fingers: chord.fingers,
-                        barres: [],
-                        position: chord.baseFret
-                    })
-                        .configure({
-                            color: currentThemeColor,
-                            nutColor: currentThemeColor,
-                            stringColor: currentThemeColor,
-                            fretColor: currentThemeColor
-                        })
+                    miniChart.chord({ fingers: chord.fingers, barres: [], position: chord.baseFret })
+                        .configure({ color: currentThemeColor, nutColor: currentThemeColor, stringColor: currentThemeColor, fretColor: currentThemeColor })
                         .draw();
                 });
             });
         }
+
+        // --- AUTOPLAY & METRONOME ENGINE ---
+        let isAutoplaying = false;
+        let isMetronomeAudioOn = false;
+        let isAutoStrumOn = false;
+        let autoplayInterval = null;
+        let measureBeat = 0; // Tracks position in the musical measure for the click pitch
+        let chordBeatCounter = 0; // Tracks how long we've been on the current chord
+
+        document.getElementById('reset-focus-btn').addEventListener('click', () => {
+            currentFocusIndex = -1;
+            measureBeat = 0;
+            chordBeatCounter = 0;
+            updateFocusVisuals();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        function playClick(isDownbeat) {
+            if (!isMetronomeAudioOn) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(isDownbeat ? 1200 : 800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function triggerAutoStrum() {
+            if (!isAutoStrumOn || currentFocusIndex < 0 || !flatPerformanceChords[currentFocusIndex]) return;
+            const chord = flatPerformanceChords[currentFocusIndex];
+            playStrum(chord.fingers, chord.baseFret, chord.capo || 0);
+        }
+
+        function metronomeTick() {
+            const timeSig = parseInt(document.getElementById('time-sig-select').value);
+
+            // Determine how many beats the current chord is supposed to last
+            let targetDuration = timeSig; // Default backwards compatibility
+            if (currentFocusIndex >= 0 && flatPerformanceChords[currentFocusIndex]) {
+                const savedBeats = flatPerformanceChords[currentFocusIndex].beats;
+                if (savedBeats) targetDuration = savedBeats;
+            }
+
+            // Advance the chord if we've reached its duration limit (or if we just hit Play)
+            if (chordBeatCounter === 0) {
+                advanceFocus();
+                triggerAutoStrum();
+            }
+
+            // Play the metronome click (high pitch exclusively on measure beat 1)
+            playClick(measureBeat === 0);
+
+            // Increment timers
+            chordBeatCounter++;
+            if (chordBeatCounter >= targetDuration) {
+                chordBeatCounter = 0; // Reset to trigger the next chord switch
+            }
+
+            measureBeat++;
+            if (measureBeat >= timeSig) {
+                measureBeat = 0; // Reset measure for the click pitch
+            }
+        }
+
+        document.getElementById('play-pause-btn').addEventListener('click', (e) => {
+            const btn = e.target;
+            if (isAutoplaying) {
+                clearInterval(autoplayInterval);
+                isAutoplaying = false;
+                btn.innerText = 'Play';
+                btn.style.background = 'var(--accent)';
+            } else {
+                const bpm = parseInt(document.getElementById('tempo-input').value) || 120;
+                const intervalMs = 60000 / bpm;
+
+                measureBeat = 0;
+                chordBeatCounter = 0;
+
+                // If paused halfway, step back 1 so we resume gracefully on the focused chord
+                if (currentFocusIndex >= 0) {
+                    currentFocusIndex--;
+                }
+
+                metronomeTick(); // Fire immediately
+
+                autoplayInterval = setInterval(metronomeTick, intervalMs);
+                isAutoplaying = true;
+                btn.innerText = 'Pause';
+                btn.style.background = '#e74c3c';
+            }
+        });
+
+        document.getElementById('tempo-input').addEventListener('change', (e) => {
+            if (isAutoplaying) {
+                clearInterval(autoplayInterval);
+                const bpm = parseInt(e.target.value) || 120;
+                autoplayInterval = setInterval(metronomeTick, 60000 / bpm);
+            }
+        });
+
+        document.getElementById('toggle-audio-btn').addEventListener('click', (e) => {
+            isMetronomeAudioOn = !isMetronomeAudioOn;
+            const btn = e.target;
+            if (isMetronomeAudioOn) {
+                initAudio();
+                btn.innerText = 'Metronome: ON';
+                btn.style.background = 'var(--accent)';
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+            } else {
+                btn.innerText = 'Metronome: OFF';
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--primary)';
+                btn.style.border = '1px solid var(--border)';
+            }
+        });
+
+        document.getElementById('toggle-strum-audio-btn').addEventListener('click', (e) => {
+            isAutoStrumOn = !isAutoStrumOn;
+            const btn = e.target;
+            if (isAutoStrumOn) {
+                initAudio();
+                btn.innerText = 'Strum: ON';
+                btn.style.background = 'var(--accent)';
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+            } else {
+                btn.innerText = 'Strum: OFF';
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--primary)';
+                btn.style.border = '1px solid var(--border)';
+            }
+        });
 
         // --- INITIALIZATION ---
         window.onload = loadChordDatabase;
