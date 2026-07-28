@@ -225,7 +225,7 @@
             </div>
 
             <!-- VARIANT SEARCH INPUT -->
-            <input type="text" id="variant-input" list="variant-list" placeholder="e.g. minor, m7, maj7" value="">
+            <input type="text" id="variant-input" list="variant-list" placeholder="e.g. m, 7, mmaj7" value="">
             <datalist id="variant-list">
                 <!-- Options will be injected here dynamically -->
             </datalist>
@@ -292,7 +292,11 @@
                 <button id="tab-blocks" class="active" style="background: var(--accent); color: white; padding: 6px 12px; font-size: 14px; border: none; border-radius: 4px;">Blocks</button>
                 <button id="tab-songs" style="background: var(--surface); color: var(--primary); padding: 6px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 4px;">Songs</button>
             </div>
-            <div style="width: 70px;"></div>
+            <button id="export-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-weight: bold;">Save File</button>
+            <!-- Invisible file input for the JSON backup -->
+            <input type="file" id="import-backup-file" accept=".json" style="display: none;" />
+            <!-- New Restore Button -->
+            <button id="import-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--primary); color: var(--primary); border-radius: 4px; font-weight: bold;">Restore from File</button>
         </div>
 
         <div id="library-blocks-container">
@@ -357,6 +361,15 @@
 
         <!-- AUTOPLAY CONTROL BAR -->
         <div id="autoplay-controls" style="display: flex; gap: 10px; justify-content: center; align-items: center; padding: 12px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+            <!-- Tone Selector -->
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 14px; font-weight: bold;">Tone:</label>
+                <select id="instrument-select" style="padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+                    <option value="acoustic">Acoustic</option>
+                    <option value="piano">Piano</option>
+                    <option value="metal">Metal</option>
+                </select>
+            </div>
             <div style="display: flex; align-items: center; gap: 5px;">
                 <label style="font-size: 14px; font-weight: bold;">BPM:</label>
                 <input type="number" id="tempo-input" value="120" min="40" max="240" style="width: 60px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
@@ -636,6 +649,7 @@
         variantInput.addEventListener('input', (e) => {
             let val = e.target.value.trim();
             if (val === '') val = 'major'; // Empty field equals major
+            if (val === 'm') val = 'minor'; // Plain "m" equals minor
 
             // Only re-render if they typed/selected a valid chord variant
             if (chordDB[currentRoot] && chordDB[currentRoot][val]) {
@@ -751,6 +765,7 @@
             btn.classList.add('active');
         }
 
+        //Update pending
         function playStrum(fingers, baseFret, capo) {
             initAudio();
             const now = audioCtx.currentTime;
@@ -795,7 +810,7 @@
         });
 
         // --- EDITOR LOGIC ---
-        const mainSections = () => document.querySelectorAll('.section:not(#editor-view):not(#library-view):not(#performance-view):not(#song-editor-view)');
+        const mainSections = () => document.querySelectorAll('.section:not(#editor-view):not(#library-view):not(#performance-view):not(#song-editor-view):not(#lyrics-studio-view)');
 
         function toggleEditor(show) {
             const editorView = document.getElementById('editor-view');
@@ -819,16 +834,34 @@
 
             currentBlockDraft.forEach((chord, index) => {
                 const item = document.createElement('div');
-                // Added bottom margin so stacked items don't touch
                 item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 16px; margin-bottom: 8px;';
 
                 const displayVariant = chord.variant === 'major' ? '' : chord.variant;
                 const capoBadge = chord.capo > 0 ? `<span style="color: var(--accent); font-size: 14px; margin-left: 6px;">(Capo ${chord.capo})</span>` : '';
-                const beatBadge = chord.beats ? `<span style="font-size: 14px; background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">${chord.beats} Beats</span>` : '';
+
+                // --- INLINE CHORD EDITING ---
+
+                // 1. Beats Dropdown
+                const beatsOptions = [1, 2, 3, 4, 6, 8].map(b => `<option value="${b}" ${chord.beats === b ? 'selected' : ''}>${b} Beats</option>`).join('');
+                const beatSelectHTML = `<select class="draft-beat-select" data-index="${index}" style="font-size: 13px; background: var(--accent); color: white; padding: 2px 4px; border-radius: 4px; border: none; outline: none; margin-left: 8px; cursor: pointer;">${beatsOptions}</select>`;
+
+                // 2. Position Dropdown
+                let maxPos = 1;
+                if (chordDB[chord.root] && chordDB[chord.root][chord.variant]) {
+                    maxPos = chordDB[chord.root][chord.variant].length;
+                }
+
+                let posOptions = '';
+                for (let p = 0; p < maxPos; p++) {
+                    posOptions += `<option value="${p}" ${chord.positionIndex === p ? 'selected' : ''}>Pos ${p + 1}</option>`;
+                }
+                const posSelectHTML = maxPos > 1
+                    ? `<select class="draft-pos-select" data-index="${index}" style="font-size: 13px; background: var(--surface); color: var(--primary); padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border); outline: none; margin-left: 8px; cursor: pointer;">${posOptions}</select>`
+                    : `<span style="font-size: 13px; opacity: 0.8; margin-left: 8px;">Pos 1</span>`;
 
                 // Text container
                 const textDiv = document.createElement('div');
-                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatBadge} <span style="font-size: 14px; opacity: 0.8; margin-left: 8px;">Pos ${chord.positionIndex + 1}</span>`;
+                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatSelectHTML} ${posSelectHTML}`;
 
                 // Controls container
                 const controlsDiv = document.createElement('div');
@@ -881,6 +914,34 @@
                 list.appendChild(item);
             });
         }
+
+        // --- SMART INLINE EDITOR LOGIC ---
+        // Uses event delegation
+        document.getElementById('draft-list').addEventListener('change', (e) => {
+            const target = e.target;
+            const index = parseInt(target.getAttribute('data-index'), 10);
+
+            // Handle Beat change
+            if (target.classList.contains('draft-beat-select')) {
+                currentBlockDraft[index].beats = parseInt(target.value, 10);
+            }
+            // Handle Position Change
+            else if (target.classList.contains('draft-pos-select')) {
+                const newPosIndex = parseInt(target.value, 10);
+                const chord = currentBlockDraft[index];
+
+                // Lookup the new fingering data from the database
+                if (chordDB[chord.root] && chordDB[chord.root][chord.variant]) {
+                    const posData = chordDB[chord.root][chord.variant][newPosIndex];
+                    const parsedShape = parseChordString(posData.frets);
+
+                    // Update the chord's physical metadata
+                    chord.positionIndex = newPosIndex;
+                    chord.fingers = parsedShape.fingers;
+                    chord.baseFret = posData.baseFret || 1;
+                }
+            }
+        });
 
         document.getElementById('view-draft-btn').addEventListener('click', () => toggleEditor(true));
         document.getElementById('close-editor-btn').addEventListener('click', () => toggleEditor(false));
@@ -1082,6 +1143,7 @@
         document.getElementById('create-song-btn').addEventListener('click', () => {
             currentSongDraft = [];
             currentEditingSongId = null;
+            currentSongLyrics = '';
             document.getElementById('song-name-input').value = '';
             renderSongDraftList();
             toggleLibrary(false);
@@ -1329,10 +1391,21 @@
                     const chordName = segments[i].trim();
                     const lyricText = segments[i + 1] || '';
 
+                    // Normalize user shorthand (e.g., "Am" -> "A minor") for validation
+                    let searchName = chordName;
+                    const rootMatch = searchName.match(/^[A-G][#b]?/);
+                    if (rootMatch) {
+                        let root = rootMatch[0];
+                        let variant = searchName.slice(root.length).trim();
+                        if (variant.toLowerCase() === 'm') variant = 'minor';
+                        searchName = `${root} ${variant}`.trim();
+                    }
+
                     const pair = document.createElement('span');
                     pair.className = 'chord-pair';
 
-                    const isVerified = activeRoots.has(chordName);
+                    // Check against the normalized 'searchName' instead of raw 'chordName'
+                    const isVerified = activeRoots.has(searchName);
                     const statusClass = isVerified ? 'verified' : 'missing';
                     const titleAttr = isVerified ? '' : `title="Click to auto-generate block for ${chordName}"`;
 
@@ -1361,35 +1434,99 @@
                 return alert(`Sorry, "${root} ${variant}" is not in the database yet!`);
             }
 
-            // Create a dedicated block for this missing chord
+            // Get the target chord data
             const targetPos = chordDB[root][variant][0];
             const parsedShape = parseChordString(targetPos.frets);
 
-            const quickBlock = {
-                id: Date.now(),
-                name: `[Auto] ${chordStr}`,
-                chords: [{
-                    root: root,
-                    displayRoot: root,
-                    variant: variant,
-                    positionIndex: 0,
-                    fingers: parsedShape.fingers,
-                    baseFret: targetPos.baseFret || 1,
-                    capo: 0,
-                    beats: 4
-                }]
+            const newChordData = {
+                root: root,
+                displayRoot: root,
+                variant: variant,
+                positionIndex: 0,
+                fingers: parsedShape.fingers,
+                baseFret: targetPos.baseFret || 1,
+                capo: 0,
+                beats: 4
             };
 
-            // Save to LocalStorage instantly
+            // Fetch existing blocks
             const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
-            savedBlocks.push(quickBlock);
-            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
 
-            // Inject directly into current song and re-render
-            currentSongDraft.push(quickBlock.id);
+            // Look for existing Auto-Added Chords block
+            let autoBlock = savedBlocks.find(b => b.name === "Auto-Added Chords");
+
+            if (!autoBlock) {
+                // Create it if it doesn't exist
+                autoBlock = {
+                    id: Date.now(),
+                    name: "Auto-Added Chords",
+                    chords: []
+                };
+                savedBlocks.push(autoBlock);
+            }
+
+            // Add the chord to the block (check to prevent duplicates in the list)
+            const chordKey = `${root} ${variant}`;
+            const alreadyInBlock = autoBlock.chords.some(c => `${c.root} ${c.variant}` === chordKey);
+
+            if (!alreadyInBlock) {
+                autoBlock.chords.push(newChordData);
+                localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
+            }
+
+            // Inject block into current song ONLY if it isn't already in the timeline
+            if (!currentSongDraft.includes(autoBlock.id)) {
+                currentSongDraft.push(autoBlock.id);
+            }
+
+            // Re-render UI
             renderSongDraftList();
             renderStudioLyrics(currentSongLyrics);
         };
+
+        /* Under riview - Might be better for the user to have a merge feature in the chord block and song mode
+      
+        // --- TIMELINE MERGER ---
+        window.mergeTimelineIntoBlock = function () {
+            if (currentSongDraft.length < 2) {
+                return alert("You need at least 2 blocks in your song timeline to merge them.");
+            }
+
+            const newBlockName = prompt("Give a name for your newly merged block:", "Merged Verse/Chorus");
+            if (!newBlockName) return; // User cancelled
+
+            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+            let mergedChords = [];
+
+            // Iterate through the timeline and extract every chord
+            currentSongDraft.forEach(blockId => {
+                const block = savedBlocks.find(b => b.id === blockId);
+                if (block) {
+                    // We use JSON parse/stringify to deep-copy the chords so we don't accidentally link references
+                    mergedChords = mergedChords.concat(JSON.parse(JSON.stringify(block.chords)));
+                }
+            });
+
+            // Create the new super-block
+            const newBlock = {
+                id: Date.now(),
+                name: newBlockName,
+                chords: mergedChords
+            };
+
+            // Save it to the library
+            savedBlocks.push(newBlock);
+            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
+
+            // Clear the cluttered timeline and replace it with our single new block
+            currentSongDraft = [newBlock.id];
+
+            // Re-render the UI
+            renderSongDraftList();
+            alert(`Successfully fused into a new block: "${newBlockName}"!`);
+        };
+
+        */
 
         // The Plain-Text Translator (Exporter)
         document.getElementById('export-lyrics-txt-btn').addEventListener('click', () => {
@@ -1442,6 +1579,115 @@
             URL.revokeObjectURL(url);
         });
 
+        // --- DATA BACKUP LOGIC ---
+        document.getElementById('export-backup-btn').addEventListener('click', () => {
+            // Bundle up both blocks and songs
+            const appData = {
+                chordBlocks: JSON.parse(localStorage.getItem('chordBlocks') || '[]'),
+                chordSongs: JSON.parse(localStorage.getItem('chordSongs') || '[]')
+            };
+
+            if (appData.chordBlocks.length === 0 && appData.chordSongs.length === 0) {
+                return alert("Your library is empty. Nothing to backup!");
+            }
+
+            // Format as readable JSON
+            const dataString = JSON.stringify(appData, null, 2);
+
+            // Create the downloadable Blob
+            const blob = new Blob([dataString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            // Create invisible trigger link
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.href = url;
+
+            // Timestamp the file
+            const dateStamp = new Date().toISOString().slice(0, 10);
+            downloadAnchor.download = `chord-helper-backup-${dateStamp}.json`;
+
+            // Execute download and cleanup
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            document.body.removeChild(downloadAnchor);
+            URL.revokeObjectURL(url);
+        });
+
+        // --- DATA RESTORE LOGIC ---
+        // 1. Route button click to the hidden file input
+        document.getElementById('import-backup-btn').addEventListener('click', () => {
+            document.getElementById('import-backup-file').click();
+        });
+
+        // 2. Handle the file upload safely
+        document.getElementById('import-backup-file').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+
+                    if (!importedData.chordBlocks && !importedData.chordSongs) {
+                        throw new Error("This doesn't look like a valid Chord Helper backup file.");
+                    }
+
+                    // Check if the user already has data to protect
+                    const currentBlocksStr = localStorage.getItem('chordBlocks');
+                    const hasExistingData = currentBlocksStr && currentBlocksStr !== '[]';
+                    let mode = "overwrite";
+
+                    if (hasExistingData) {
+                        // Ask the user how they want to handle the collision
+                        const wantsMerge = confirm("Backup loaded!\n\nDo you want to MERGE this with your existing library?\n\n• Click 'OK' to safely MERGE.\n• Click 'Cancel' to OVERWRITE (will delete current unsaved work).");
+
+                        if (!wantsMerge) {
+                            const confirmOverwrite = confirm("⚠️ ARE YOU SURE? This will completely erase your current library and replace it with the backup.");
+                            if (!confirmOverwrite) {
+                                e.target.value = ''; // Abort and reset input
+                                return;
+                            }
+                        } else {
+                            mode = "merge";
+                        }
+                    }
+
+                    if (mode === "overwrite") {
+                        localStorage.setItem('chordBlocks', JSON.stringify(importedData.chordBlocks || []));
+                        localStorage.setItem('chordSongs', JSON.stringify(importedData.chordSongs || []));
+                    } else {
+                        // Merge Logic: Combine arrays but prevent exact duplicate IDs
+                        const currentBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
+                        const currentSongs = JSON.parse(localStorage.getItem('chordSongs') || '[]');
+
+                        const mergedBlocks = [...currentBlocks];
+                        (importedData.chordBlocks || []).forEach(ib => {
+                            if (!mergedBlocks.find(cb => cb.id === ib.id)) mergedBlocks.push(ib);
+                        });
+
+                        const mergedSongs = [...currentSongs];
+                        (importedData.chordSongs || []).forEach(is => {
+                            if (!mergedSongs.find(cs => cs.id === is.id)) mergedSongs.push(is);
+                        });
+
+                        localStorage.setItem('chordBlocks', JSON.stringify(mergedBlocks));
+                        localStorage.setItem('chordSongs', JSON.stringify(mergedSongs));
+                    }
+
+                    alert(`Backup successfully ${mode === 'merge' ? 'merged' : 'restored'}!`);
+
+                    // Reset input and refresh UI (assuming you have a renderLibrary function)
+                    e.target.value = '';
+                    if (typeof renderLibrary === 'function') renderLibrary();
+
+                } catch (error) {
+                    alert("Error loading backup: " + error.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+
         // --- PERFORMANCE LOGIC ---
         let currentPerformanceId = null;
         let currentPerformanceType = 'block';
@@ -1484,7 +1730,12 @@
             if (e.target.closest('#autoplay-controls') || e.target.closest('.header-row')) {
                 return;
             }
-            advanceFocus();
+            // Scrolls down by 90% of the screen height
+            window.scrollBy({
+                top: window.innerHeight * 0.9,
+                behavior: 'smooth'
+            });
+            // advanceFocus(); // If tap needs to only advance chords
         });
 
         document.getElementById('reset-focus-btn').addEventListener('click', () => {
