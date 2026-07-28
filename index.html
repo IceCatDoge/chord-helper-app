@@ -225,7 +225,7 @@
             </div>
 
             <!-- VARIANT SEARCH INPUT -->
-            <input type="text" id="variant-input" list="variant-list" placeholder="e.g. m, 7, mmaj7" value="">
+            <input type="text" id="variant-input" list="variant-list" style="text-transform: lowercase" placeholder="e.g. m, 7, mmaj7" value="">    <!-- Enforce lower case to fix phone/tablet input field default behaviour -->
             <datalist id="variant-list">
                 <!-- Options will be injected here dynamically -->
             </datalist>
@@ -292,11 +292,11 @@
                 <button id="tab-blocks" class="active" style="background: var(--accent); color: white; padding: 6px 12px; font-size: 14px; border: none; border-radius: 4px;">Blocks</button>
                 <button id="tab-songs" style="background: var(--surface); color: var(--primary); padding: 6px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 4px;">Songs</button>
             </div>
-            <button id="export-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-weight: bold;">Save File</button>
+            <button id="export-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-weight: bold;">Back up</button>
             <!-- Invisible file input for the JSON backup -->
             <input type="file" id="import-backup-file" accept=".json" style="display: none;" />
             <!-- New Restore Button -->
-            <button id="import-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--primary); color: var(--primary); border-radius: 4px; font-weight: bold;">Restore from File</button>
+            <button id="import-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--primary); color: var(--primary); border-radius: 4px; font-weight: bold;">Load Lib</button>
         </div>
 
         <div id="library-blocks-container">
@@ -365,9 +365,19 @@
             <div style="display: flex; align-items: center; gap: 5px;">
                 <label style="font-size: 14px; font-weight: bold;">Tone:</label>
                 <select id="instrument-select" style="padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
-                    <option value="acoustic">Acoustic</option>
+                    <option value="acoustic">Acoustic Gtr</option>
                     <option value="piano">Piano</option>
-                    <option value="metal">Metal</option>
+                    <option value="metal">Distortion Gtr</option>
+                </select>
+            </div>
+            <!-- Strum Style Selector -->
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 14px; font-weight: bold;">Style:</label>
+                <select id="strum-pattern-select" style="padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
+                    <option value="down">Downstroke</option>
+                    <option value="up">Upstroke (Ska)</option>
+                    <option value="arp">Arpeggio</option>
+                    <option value="chop">Chop (Staccato)</option>
                 </select>
             </div>
             <div style="display: flex; align-items: center; gap: 5px;">
@@ -765,7 +775,8 @@
             btn.classList.add('active');
         }
 
-        //Update pending
+        /*
+        //Old single task function (delete if update works without problems)
         function playStrum(fingers, baseFret, capo) {
             initAudio();
             const now = audioCtx.currentTime;
@@ -786,6 +797,122 @@
                     osc.connect(gain); gain.connect(audioCtx.destination);
                     osc.start(now + delay); osc.stop(now + delay + 2.5);
                     delay += 0.04;
+                }
+            });
+        }
+
+        */
+
+        // Distortion curve math generator for the Metal tone
+        function makeDistortionCurve(amount) {
+            let k = typeof amount === 'number' ? amount : 50;
+            let n_samples = 44100;
+            let curve = new Float32Array(n_samples);
+            let deg = Math.PI / 180;
+            for (let i = 0; i < n_samples; ++i) {
+                let x = i * 2 / n_samples - 1;
+                curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+            }
+            return curve;
+        }
+
+        // Modular Strum & Pattern Engine
+        function playStrum(fingers, baseFret, capo) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const bFret = baseFret || 1;
+
+            // Check selected instrument & pattern (with safe fallbacks)
+            const instSelect = document.getElementById('instrument-select');
+            const instrument = instSelect ? instSelect.value : 'acoustic';
+
+            const patternSelect = document.getElementById('strum-pattern-select');
+            const pattern = patternSelect ? patternSelect.value : 'down';
+
+            // Master volume control (metal needs a limiter so it doesn't clip badly)
+            const masterStrumGain = audioCtx.createGain();
+            masterStrumGain.gain.value = instrument === 'metal' ? 0.3 : 0.8;
+            masterStrumGain.connect(audioCtx.destination);
+
+            // Setup Distortion Node if needed
+            let distortionNode = null;
+            if (instrument === 'metal') {
+                distortionNode = audioCtx.createWaveShaper();
+                distortionNode.curve = makeDistortionCurve(400); // Heavy crunch
+                distortionNode.oversample = '4x';
+                distortionNode.connect(masterStrumGain);
+            }
+
+            // PATTERN LOGIC: Determine string striking order
+            let sortedFingers = [...fingers];
+            if (pattern === 'up') {
+                // Upstroke: High strings (1) to Low strings (6)
+                sortedFingers.sort((a, b) => a[0] - b[0]);
+            } else {
+                // Downstroke/Arp/Chop: Low strings (6) to High strings (1)
+                sortedFingers.sort((a, b) => b[0] - a[0]);
+            }
+
+            // PATTERN LOGIC: Calculate delays and sustain
+            let delayOffset = 0;
+            let stepDelay = (instrument === 'piano') ? 0.01 : 0.04; // Default strum speed
+
+            if (pattern === 'arp') {
+                stepDelay = 0.15; // Slow rolling fingerpick
+            } else if (pattern === 'chop') {
+                stepDelay = 0.0; // All notes hit exactly at once
+            }
+
+            sortedFingers.forEach(([string, fret]) => {
+                if (fret !== 'x') {
+                    const absoluteFret = fret === 0 ? capo : (bFret + fret - 1 + capo);
+                    const freq = openStrings[string] * Math.pow(2, absoluteFret / 12);
+
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    // THE BUG FIX: Actually assigning the frequency to the oscillator!
+                    osc.frequency.setValueAtTime(freq, now + delayOffset);
+
+                    // Modify decay length for staccato "Chop" playing
+                    let sustain = 2.5;
+                    if (pattern === 'chop') {
+                        sustain = 0.15; // Extremely short, muted decay
+                    } else if (instrument === 'piano') {
+                        sustain = 3.0;
+                    }
+
+                    // Instrument waveforms and envelopes
+                    if (instrument === 'piano') {
+                        osc.type = 'sine';
+                        gain.gain.setValueAtTime(0, now + delayOffset);
+                        gain.gain.linearRampToValueAtTime(0.6, now + delayOffset + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + sustain);
+                    } else if (instrument === 'metal') {
+                        osc.type = 'sawtooth';
+                        gain.gain.setValueAtTime(0, now + delayOffset);
+                        gain.gain.linearRampToValueAtTime(0.5, now + delayOffset + 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + (pattern === 'chop' ? sustain : 1.5));
+                    } else {
+                        osc.type = 'triangle';
+                        gain.gain.setValueAtTime(0, now + delayOffset);
+                        gain.gain.linearRampToValueAtTime(0.4, now + delayOffset + 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + sustain);
+                    }
+
+                    osc.connect(gain);
+
+                    // Route through distortion if active
+                    if (distortionNode) {
+                        gain.connect(distortionNode);
+                    } else {
+                        gain.connect(masterStrumGain);
+                    }
+
+                    osc.start(now + delayOffset);
+                    osc.stop(now + delayOffset + sustain + 0.5); // Provide a tiny buffer before strict engine shutoff
+
+                    delayOffset += stepDelay;
                 }
             });
         }
