@@ -378,6 +378,8 @@
                     <option value="acoustic">Acoustic Gtr</option>
                     <option value="piano">Piano</option>
                     <option value="metal">Distortion Gtr</option>
+                    <option value="harpsichord">Harpsichord</option>
+                    <option value="strings">Orchestral Strings</option>
                 </select>
             </div>
             <!-- Strum Style Selector -->
@@ -933,6 +935,17 @@
                         gain.gain.setValueAtTime(0, now + delayOffset);
                         gain.gain.linearRampToValueAtTime(0.5, now + delayOffset + 0.05);
                         gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + (pattern === 'chop' ? sustain : 1.5));
+                    } else if (instrument === 'harpsichord') {
+                        osc.type = 'sawtooth';
+                        gain.gain.setValueAtTime(0, now + delayOffset);
+                        gain.gain.linearRampToValueAtTime(0.4, now + delayOffset + 0.01);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + 1.2);
+                    } else if (instrument === 'strings') {
+                        osc.type = 'sawtooth';
+                        gain.gain.setValueAtTime(0, now + delayOffset);
+                        // Needs some re-touch
+                        gain.gain.linearRampToValueAtTime(0.3, now + delayOffset + 0.4);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delayOffset + sustain + 1.5);
                     } else {
                         osc.type = 'triangle';
                         gain.gain.setValueAtTime(0, now + delayOffset);
@@ -950,7 +963,7 @@
                     }
 
                     osc.start(now + delayOffset);
-                    osc.stop(now + delayOffset + sustain + 0.5); // Provide a tiny buffer before strict engine shutoff
+                    osc.stop(now + delayOffset + sustain + 2.0); // Buffer before strict engine shutoff, original value :0.5 (before strings)
 
                     delayOffset += stepDelay;
                 }
