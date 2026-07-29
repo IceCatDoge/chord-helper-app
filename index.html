@@ -23,6 +23,14 @@
             --border: #444444;
         }
 
+        body.theme-sunburst {
+            --primary: #f8f1e1;
+            --accent: #d95c14;
+            --bg: radial-gradient(circle at center, #eab034 0%, #b83b10 45%, #1a0f0c 90%);
+            --surface: rgba(26, 15, 12, 0.75);
+            --border: #f8f1e1;
+        }
+
         body.theme-neon {
             --primary: #ffffff;
             --accent: #00ffcc;
@@ -199,6 +207,7 @@
             <select id="theme-selector">
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
+                <option value="sunburst">Sunburst</option>
                 <option value="neon">Neon</option>
                 <option value="high-contrast">High Contrast</option>
             </select>
@@ -253,6 +262,7 @@
                 <option value="8">8 Beats</option>
             </select>
             <button id="add-chord-btn" style="width: 140px; display: none;">➕ Add to Block</button>
+            <button id="add-rest-btn" style="width: 130px; display: none; background: transparent; color: var(--accent); border-color: var(--accent);">Add Rest</button>
         </div>
     </div>
 
@@ -631,6 +641,7 @@
 
                 strumBtn.style.display = 'inline-block';
                 document.getElementById('add-chord-btn').style.display = 'inline-block';
+                document.getElementById('add-rest-btn').style.display = 'inline-block';
                 document.getElementById('chord-duration-select').style.display = 'inline-block';
 
                 if (positions.length > 1) {
@@ -684,6 +695,34 @@
             }
         });
 
+        document.getElementById('add-rest-btn').addEventListener('click', () => {
+            const selectedBeats = parseInt(document.getElementById('chord-duration-select').value) || 4;
+
+            // Save a unique object that the app recognizes as a silence
+            currentBlockDraft.push({
+                isRest: true,
+                root: 'Rest',
+                displayRoot: 'Rest',
+                variant: '',
+                positionIndex: 0,
+                fingers: [],
+                baseFret: 1,
+                capo: 0,
+                beats: selectedBeats
+            });
+
+            // Visual feedback
+            const btn = document.getElementById('add-rest-btn');
+            const originalText = btn.innerText;
+            btn.innerText = `Added!`;
+            setTimeout(() => { btn.innerText = originalText; }, 1000);
+
+            document.getElementById('draft-count').innerText = currentBlockDraft.length;
+            document.getElementById('draft-nav-bar').style.display = 'flex';
+            document.getElementById('draft-nav-bar').style.bottom = '0';
+            document.body.style.paddingBottom = '80px';
+        });
+
         // --- SEQUENCE DRAFTING STATE ---
         let currentBlockDraft = [];
         let currentEditingBlockId = null;
@@ -714,6 +753,7 @@
 
             // Update the counter, slide the bar up, and pad the body so it doesn't hide the tuner
             document.getElementById('draft-count').innerText = currentBlockDraft.length;
+            document.getElementById('draft-nav-bar').style.display = 'flex';
             document.getElementById('draft-nav-bar').style.bottom = '0';
             document.body.style.paddingBottom = '80px';
         });
@@ -943,15 +983,19 @@
             const editorView = document.getElementById('editor-view');
             const draftBar = document.getElementById('draft-nav-bar');
 
+            // MASTER RESET: Hide all views first
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+
             if (show) {
-                mainSections().forEach(sec => sec.style.display = 'none');
                 editorView.style.display = 'block';
                 draftBar.style.display = 'none'; // Hide floating bar while editing
                 renderDraftList();
             } else {
-                mainSections().forEach(sec => sec.style.display = 'block');
-                editorView.style.display = 'none';
-                if (currentBlockDraft.length > 0) draftBar.style.display = 'flex';
+                mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
+                if (currentBlockDraft.length > 0) {
+                    draftBar.style.display = 'flex';
+                    draftBar.style.bottom = '0';
+                }
             }
         }
 
@@ -988,7 +1032,11 @@
 
                 // Text container
                 const textDiv = document.createElement('div');
-                textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatSelectHTML} ${posSelectHTML}`;
+                if (chord.isRest) {
+                    textDiv.innerHTML = `<strong style="color: var(--accent);">⏸ Rest (Silence)</strong>${beatSelectHTML}`;
+                } else {
+                    textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatSelectHTML} ${posSelectHTML}`;
+                }
 
                 // Controls container
                 const controlsDiv = document.createElement('div');
@@ -1110,6 +1158,7 @@
 
             // Reset the app state and return to main view
             document.getElementById('clear-draft-btn').click();
+            updateDraftBar();
             nameInput.value = '';
         });
 
@@ -1118,22 +1167,19 @@
             const libraryView = document.getElementById('library-view');
             const draftBar = document.getElementById('draft-nav-bar');
 
+            // MASTER RESET
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+
             if (show) {
-                mainSections().forEach(sec => sec.style.display = 'none');
-                document.getElementById('editor-view').style.display = 'none';
-                if (document.getElementById('song-editor-view')) {
-                    document.getElementById('song-editor-view').style.display = 'none';
-                }
-                if (document.getElementById('performance-view')) {
-                    document.getElementById('performance-view').style.display = 'none'; // Ensure performance view stays shut
-                }
                 libraryView.style.display = 'block';
                 draftBar.style.display = 'none';
                 renderLibrary();
             } else {
-                mainSections().forEach(sec => sec.style.display = 'block');
-                libraryView.style.display = 'none';
-                if (currentBlockDraft.length > 0) draftBar.style.display = 'flex';
+                mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
+                if (currentBlockDraft.length > 0) {
+                    draftBar.style.display = 'flex';
+                    draftBar.style.bottom = '0';
+                }
             }
         }
 
@@ -1171,6 +1217,13 @@
                 editBtn.innerText = 'Edit';
                 editBtn.style.cssText = 'flex: 1; padding: 8px; font-size: 14px;';
                 editBtn.onclick = () => {
+                    // Check if trying to get back to active draft
+                    if (currentBlockDraft.length > 0 && currentEditingBlockId === block.id) {
+                        toggleLibrary(false);
+                        toggleEditor(true);
+                        return; // Skip the reset, just open the editor
+                    }
+
                     if (currentBlockDraft.length > 0) {
                         if (!confirm("Warning: This will overwrite your current unsaved draft. Continue?")) return;
                     }
@@ -1244,8 +1297,11 @@
 
         function toggleSongEditor(show) {
             const editor = document.getElementById('song-editor-view');
+
+            // MASTER RESET
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+
             if (show) {
-                mainSections().forEach(sec => sec.style.display = 'none');
                 editor.style.display = 'block';
 
                 const select = document.getElementById('song-block-select');
@@ -1262,8 +1318,7 @@
                     });
                 }
             } else {
-                editor.style.display = 'none';
-                mainSections().forEach(sec => sec.style.display = 'block');
+                mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
             }
         }
 
@@ -1443,15 +1498,15 @@
 
         // UI Toggles
         document.getElementById('open-lyrics-btn').addEventListener('click', () => {
-            document.getElementById('song-editor-view').style.display = 'none';
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
             document.getElementById('lyrics-studio-view').style.display = 'block';
             document.getElementById('lyric-textarea').value = currentSongLyrics;
             document.getElementById('tab-napkin').click();
         });
 
         document.getElementById('close-lyrics-btn').addEventListener('click', () => {
-            currentSongLyrics = document.getElementById('lyric-textarea').value; // Save state on exit
-            document.getElementById('lyrics-studio-view').style.display = 'none';
+            currentSongLyrics = document.getElementById('lyric-textarea').value; 
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
             document.getElementById('song-editor-view').style.display = 'block';
         });
 
@@ -1610,50 +1665,6 @@
             renderSongDraftList();
             renderStudioLyrics(currentSongLyrics);
         };
-
-        /* Under riview - Might be better for the user to have a merge feature in the chord block and song mode
-      
-        // --- TIMELINE MERGER ---
-        window.mergeTimelineIntoBlock = function () {
-            if (currentSongDraft.length < 2) {
-                return alert("You need at least 2 blocks in your song timeline to merge them.");
-            }
-
-            const newBlockName = prompt("Give a name for your newly merged block:", "Merged Verse/Chorus");
-            if (!newBlockName) return; // User cancelled
-
-            const savedBlocks = JSON.parse(localStorage.getItem('chordBlocks') || '[]');
-            let mergedChords = [];
-
-            // Iterate through the timeline and extract every chord
-            currentSongDraft.forEach(blockId => {
-                const block = savedBlocks.find(b => b.id === blockId);
-                if (block) {
-                    // We use JSON parse/stringify to deep-copy the chords so we don't accidentally link references
-                    mergedChords = mergedChords.concat(JSON.parse(JSON.stringify(block.chords)));
-                }
-            });
-
-            // Create the new super-block
-            const newBlock = {
-                id: Date.now(),
-                name: newBlockName,
-                chords: mergedChords
-            };
-
-            // Save it to the library
-            savedBlocks.push(newBlock);
-            localStorage.setItem('chordBlocks', JSON.stringify(savedBlocks));
-
-            // Clear the cluttered timeline and replace it with our single new block
-            currentSongDraft = [newBlock.id];
-
-            // Re-render the UI
-            renderSongDraftList();
-            alert(`Successfully fused into a new block: "${newBlockName}"!`);
-        };
-
-        */
 
         // The Plain-Text Translator (Exporter)
         document.getElementById('export-lyrics-txt-btn').addEventListener('click', () => {
@@ -1857,9 +1868,9 @@
             if (e.target.closest('#autoplay-controls') || e.target.closest('.header-row')) {
                 return;
             }
-            // Scrolls down by 90% of the screen height
+            // Scrolls down by X % of the screen height
             window.scrollBy({
-                top: window.innerHeight * 0.9,
+                top: window.innerHeight * 0.85,
                 behavior: 'smooth'
             });
             // advanceFocus(); // If tap needs to only advance chords
@@ -1876,12 +1887,14 @@
             const perfView = document.getElementById('performance-view');
             const libraryView = document.getElementById('library-view');
 
+            // MASTER RESET
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+
             if (show) {
-                libraryView.style.display = 'none';
                 perfView.style.display = 'block';
+                document.getElementById('draft-nav-bar').style.display = 'none'; // Ensure draft bar stays hidden
             } else {
-                perfView.style.display = 'none';
-                libraryView.style.display = 'block';
+                libraryView.style.display = 'block'; // Performance always returns to Library
             }
         }
 
@@ -1962,10 +1975,15 @@
                     itemWrapper.appendChild(chartDiv);
                     grid.appendChild(itemWrapper);
 
-                    const miniChart = new window.svguitar.SVGuitarChord(chartDiv);
-                    miniChart.chord({ fingers: chord.fingers, barres: [], position: chord.baseFret })
-                        .configure({ color: currentThemeColor, nutColor: currentThemeColor, stringColor: currentThemeColor, fretColor: currentThemeColor })
-                        .draw();
+                    if (chord.isRest) {
+                        titleLabel.innerText = `Rest (${chord.beats} Beats)`;
+                        chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 50px; color: var(--border); opacity: 0.5;">⏸</div>';
+                    } else {
+                        const miniChart = new window.svguitar.SVGuitarChord(chartDiv);
+                        miniChart.chord({ fingers: chord.fingers, barres: [], position: chord.baseFret })
+                            .configure({ color: currentThemeColor, nutColor: currentThemeColor, stringColor: currentThemeColor, fretColor: currentThemeColor })
+                            .draw();
+                    }
                 });
             });
         }
@@ -2005,6 +2023,7 @@
         function triggerAutoStrum() {
             if (!isAutoStrumOn || currentFocusIndex < 0 || !flatPerformanceChords[currentFocusIndex]) return;
             const chord = flatPerformanceChords[currentFocusIndex];
+            if (chord.isRest) return;
             playStrum(chord.fingers, chord.baseFret, chord.capo || 0);
         }
 
@@ -2108,6 +2127,18 @@
                 btn.style.border = '1px solid var(--border)';
             }
         });
+
+        // --- HELPER FUNCTIONS ---
+        function updateDraftBar() {
+            const draftBar = document.getElementById('draft-nav-bar');
+
+            if (currentBlockDraft.length > 0) {
+                draftBar.style.display = 'flex';
+                draftBar.style.bottom = '0';
+            } else {
+                draftBar.style.display = 'none';
+            }
+        }
 
         // --- INITIALIZATION ---
         window.onload = loadChordDatabase;
