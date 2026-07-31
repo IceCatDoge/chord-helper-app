@@ -253,6 +253,12 @@
 
         <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; align-items: center;">
             <button id="strum-btn" style="width: 120px; display: none;">Strum</button>
+            <select id="chord-strum-select" style="display: none; padding: 6px; border-radius: 4px; border: 2px solid var(--accent); background: var(--surface); color: var(--primary); font-weight: bold;">
+                <option value="down" selected>↓ Down</option>
+                <option value="up">↑ Up (Ska)</option>
+                <option value="arp">≈ Arpeggio</option>
+                <option value="chop">✕ Chop</option>
+            </select>
             <select id="chord-duration-select" style="display: none; padding: 6px; border-radius: 4px; border: 2px solid var(--accent); background: var(--surface); color: var(--primary); font-weight: bold;">
                 <option value="1">1 Beat</option>
                 <option value="2">2 Beats</option>
@@ -268,7 +274,10 @@
 
     <!-- MINI TUNER -->
     <div class="section">
-        <h3 style="margin-top:0; font-size:16px;">Reference Tuner</h3>
+        <div class="header-row" style="margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 16px;">Reference Tuner</h3>
+            <button id="tuner-mode-btn" style="padding: 4px 8px; font-size: 12px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px;">Tone: Continuous</button>
+        </div>
         <div class="btn-group">
             <button class="tuner-btn" onclick="toggleTuner(this, 82.41)">E</button>
             <button class="tuner-btn" onclick="toggleTuner(this, 110.00)">A</button>
@@ -302,11 +311,15 @@
                 <button id="tab-blocks" class="active" style="background: var(--accent); color: white; padding: 6px 12px; font-size: 14px; border: none; border-radius: 4px;">Blocks</button>
                 <button id="tab-songs" style="background: var(--surface); color: var(--primary); padding: 6px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 4px;">Songs</button>
             </div>
-            <button id="export-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-weight: bold;">Back up</button>
-            <!-- Invisible file input for the JSON backup -->
+
+            <!-- NEW: Settings Dropdown -->
+            <select id="library-settings-menu" style="padding: 6px; font-size: 14px; border-radius: 4px; border: 2px solid var(--accent); background: var(--surface); color: var(--primary); font-weight: bold; outline: none;">
+                <option value="" disabled selected>Settings</option>
+                <option value="backup">Save Library as a File</option>
+                <option value="load">Load Library from File</option>
+            </select>
+            <!-- Hidden file input remains -->
             <input type="file" id="import-backup-file" accept=".json" style="display: none;" />
-            <!-- New Restore Button -->
-            <button id="import-backup-btn" style="padding: 6px 12px; font-size: 14px; background: transparent; border: 1px solid var(--primary); color: var(--primary); border-radius: 4px; font-weight: bold;">Load Lib</button>
         </div>
 
         <div id="library-blocks-container">
@@ -382,14 +395,15 @@
                     <option value="strings">Orchestral Strings</option>
                 </select>
             </div>
-            <!-- Strum Style Selector -->
+            <!-- Strum Style Override Selector -->
             <div style="display: flex; align-items: center; gap: 5px;">
-                <label style="font-size: 14px; font-weight: bold;">Style:</label>
+                <label style="font-size: 14px; font-weight: bold;">Override Strum:</label>
                 <select id="strum-pattern-select" style="padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); outline: none;">
-                    <option value="down">Downstroke</option>
-                    <option value="up">Upstroke (Ska)</option>
-                    <option value="arp">Arpeggio</option>
-                    <option value="chop">Chop (Staccato)</option>
+                    <option value="none" selected>Off (Use Saved)</option>
+                    <option value="down">All Downstrokes</option>
+                    <option value="up">All Upstrokes</option>
+                    <option value="arp">All Arpeggio</option>
+                    <option value="chop">All Chop</option>
                 </select>
             </div>
             <div style="display: flex; align-items: center; gap: 5px;">
@@ -642,6 +656,7 @@
                     .draw();
 
                 strumBtn.style.display = 'inline-block';
+                document.getElementById('chord-strum-select').style.display = 'inline-block';
                 document.getElementById('add-chord-btn').style.display = 'inline-block';
                 document.getElementById('add-rest-btn').style.display = 'inline-block';
                 document.getElementById('chord-duration-select').style.display = 'inline-block';
@@ -660,6 +675,7 @@
                 chart = null;
                 strumBtn.style.display = 'none';
                 posControls.style.display = 'none';
+                document.getElementById('chord-strum-select').style.display = 'none';
                 document.getElementById('add-chord-btn').style.display = 'none';
                 document.getElementById('chord-duration-select').style.display = 'none';
             }
@@ -710,7 +726,8 @@
                 fingers: [],
                 baseFret: 1,
                 capo: 0,
-                beats: selectedBeats
+                beats: selectedBeats,
+                strumPattern: 'none'
             });
 
             // Visual feedback
@@ -734,6 +751,7 @@
 
             const selectedBeats = parseInt(document.getElementById('chord-duration-select').value) || 4;
             const targetPitch = selectedBaseRoot + selectedAccidental; // Get the absolute pitch
+            const selectedStrum = document.getElementById('chord-strum-select').value || 'down';
 
             // Save the exact state, including shape, capo, and duration metadata
             currentBlockDraft.push({
@@ -744,7 +762,8 @@
                 fingers: activeChordData.fingers,
                 baseFret: activeChordData.baseFret,
                 capo: currentCapo,
-                beats: selectedBeats
+                beats: selectedBeats,
+                strumPattern: selectedStrum
             });
 
             // Visual feedback to user
@@ -780,12 +799,30 @@
 
         let activeTunerOsc = null;
         let activeTunerBtn = null;
+        let tunerMode = 'continuous';
+
+        // Tuner Mode Toggle Listener
+        document.getElementById('tuner-mode-btn').addEventListener('click', (e) => {
+            if (tunerMode === 'continuous') {
+                tunerMode = 'realistic';
+                e.target.innerText = 'Tone: Plucked';
+                // Cut off the continuous drone immediately if it's currently ringing
+                if (activeTunerOsc) {
+                    activeTunerOsc.stop();
+                    activeTunerOsc = null;
+                    if (activeTunerBtn) activeTunerBtn.classList.remove('active');
+                }
+            } else {
+                tunerMode = 'continuous';
+                e.target.innerText = 'Tone: Continuous';
+            }
+        });
 
         function toggleTuner(btn, freq) {
             initAudio();
 
-            // If clicking the same button, turn it off
-            if (activeTunerBtn === btn) {
+            // If clicking the same button in continuous mode, turn it off
+            if (activeTunerBtn === btn && tunerMode === 'continuous') {
                 if (activeTunerOsc) activeTunerOsc.stop();
                 btn.classList.remove('active');
                 activeTunerBtn = null;
@@ -793,57 +830,56 @@
                 return;
             }
 
-            // Stop any currently playing string
+            // Stop any currently playing string to prevent overlap
             if (activeTunerOsc) {
                 activeTunerOsc.stop();
-                activeTunerBtn.classList.remove('active');
+                if (activeTunerBtn) activeTunerBtn.classList.remove('active');
             }
 
-            // Start the new string (sustained)
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-            // Set a comfortable, continuous volume
-            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            if (tunerMode === 'realistic') {
+                osc.type = 'triangle'; // Smooth pluck sound
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
+                // Fast attack and a natural, exponential decay
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.8, audioCtx.currentTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.5);
 
-            activeTunerOsc = osc;
-            activeTunerBtn = btn;
-            btn.classList.add('active');
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 3);
+
+                activeTunerOsc = osc;
+                activeTunerBtn = btn;
+
+                // Visual flash to the button
+                btn.classList.add('active');
+                setTimeout(() => {
+                    // Only remove if it hasn't been clicked again
+                    if (activeTunerBtn === btn && tunerMode === 'realistic') {
+                        btn.classList.remove('active');
+                    }
+                }, 300);
+
+            } else {
+                // Classic Continuous Mode
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+
+                activeTunerOsc = osc;
+                activeTunerBtn = btn;
+                btn.classList.add('active');
+            }
         }
-
-        /*
-        //Old single task function (delete if update works without problems)
-        function playStrum(fingers, baseFret, capo) {
-            initAudio();
-            const now = audioCtx.currentTime;
-            let delay = 0;
-            const sortedFingers = [...fingers].sort((a, b) => b[0] - a[0]);
-            const bFret = baseFret || 1;
-
-            sortedFingers.forEach(([string, fret]) => {
-                if (fret !== 'x') {
-                    const absoluteFret = fret === 0 ? capo : (bFret + fret - 1 + capo);
-                    const freq = openStrings[string] * Math.pow(2, absoluteFret / 12);
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, now + delay);
-                    gain.gain.setValueAtTime(0, now + delay);
-                    gain.gain.linearRampToValueAtTime(0.4, now + delay + 0.05);
-                    gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 2.5);
-                    osc.connect(gain); gain.connect(audioCtx.destination);
-                    osc.start(now + delay); osc.stop(now + delay + 2.5);
-                    delay += 0.04;
-                }
-            });
-        }
-
-        */
 
         // Distortion curve math generator for the Metal tone
         function makeDistortionCurve(amount) {
@@ -859,7 +895,7 @@
         }
 
         // Modular Strum & Pattern Engine
-        function playStrum(fingers, baseFret, capo) {
+        function playStrum(fingers, baseFret, capo, chordPattern = 'down') {
             initAudio();
             const now = audioCtx.currentTime;
             const bFret = baseFret || 1;
@@ -868,8 +904,9 @@
             const instSelect = document.getElementById('instrument-select');
             const instrument = instSelect ? instSelect.value : 'acoustic';
 
-            const patternSelect = document.getElementById('strum-pattern-select');
-            const pattern = patternSelect ? patternSelect.value : 'down';
+            // const patternSelect = document.getElementById('strum-pattern-select'); // Old code. May still have use later
+            // const pattern = patternSelect ? patternSelect.value : 'down';
+            const pattern = chordPattern;
 
             // Master volume control (metal needs a limiter so it doesn't clip badly)
             const masterStrumGain = audioCtx.createGain();
@@ -972,7 +1009,8 @@
 
         document.getElementById('strum-btn').addEventListener('click', () => {
             if (!activeChordData) return;
-            playStrum(activeChordData.fingers, activeChordData.baseFret, currentCapo);
+            const currentPattern = document.getElementById('chord-strum-select').value;
+            playStrum(activeChordData.fingers, activeChordData.baseFret, currentCapo, currentPattern);
         });
 
         // --- THEMES ---
@@ -1000,10 +1038,12 @@
             document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
 
             if (show) {
+                document.getElementById('capo-selector').style.display = 'none';
                 editorView.style.display = 'block';
                 draftBar.style.display = 'none'; // Hide floating bar while editing
                 renderDraftList();
             } else {
+                document.getElementById('capo-selector').style.display = 'inline-block';
                 mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
                 if (currentBlockDraft.length > 0) {
                     draftBar.style.display = 'flex';
@@ -1029,6 +1069,7 @@
                 const beatsOptions = [1, 2, 3, 4, 6, 8].map(b => `<option value="${b}" ${chord.beats === b ? 'selected' : ''}>${b} Beats</option>`).join('');
                 const beatSelectHTML = `<select class="draft-beat-select" data-index="${index}" style="font-size: 13px; background: var(--accent); color: white; padding: 2px 4px; border-radius: 4px; border: none; outline: none; margin-left: 8px; cursor: pointer;">${beatsOptions}</select>`;
 
+
                 // 2. Position Dropdown
                 let maxPos = 1;
                 if (chordDB[chord.root] && chordDB[chord.root][chord.variant]) {
@@ -1043,12 +1084,19 @@
                     ? `<select class="draft-pos-select" data-index="${index}" style="font-size: 13px; background: var(--surface); color: var(--primary); padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border); outline: none; margin-left: 8px; cursor: pointer;">${posOptions}</select>`
                     : `<span style="font-size: 13px; opacity: 0.8; margin-left: 8px;">Pos 1</span>`;
 
-                // Text container
+                // 3. Strum Dropdown
+                const strums = [
+                    { v: 'down', l: '↓ Down' }, { v: 'up', l: '↑ Up' }, { v: 'arp', l: '≈ Arp' }, { v: 'chop', l: '✕ Chop' }
+                ];
+                const strumOptions = strums.map(s => `<option value="${s.v}" ${chord.strumPattern === s.v ? 'selected' : ''}>${s.l}</option>`).join('');
+                const strumSelectHTML = `<select class="draft-strum-select" data-index="${index}" style="font-size: 13px; background: var(--surface); color: var(--primary); padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border); outline: none; margin-left: 8px; cursor: pointer;">${strumOptions}</select>`;
+
+                // Text container (Declared AFTER the select HTML strings are generated)
                 const textDiv = document.createElement('div');
                 if (chord.isRest) {
                     textDiv.innerHTML = `<strong style="color: var(--accent);">⏸ Rest (Silence)</strong>${beatSelectHTML}`;
                 } else {
-                    textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatSelectHTML} ${posSelectHTML}`;
+                    textDiv.innerHTML = `<strong>${chord.root} ${displayVariant}</strong>${capoBadge}${beatSelectHTML}${strumSelectHTML} ${posSelectHTML}`;
                 }
 
                 // Controls container
@@ -1184,10 +1232,12 @@
             document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
 
             if (show) {
+                document.getElementById('capo-selector').style.display = 'none';
                 libraryView.style.display = 'block';
                 draftBar.style.display = 'none';
                 renderLibrary();
             } else {
+                document.getElementById('capo-selector').style.display = 'inline-block';
                 mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
                 if (currentBlockDraft.length > 0) {
                     draftBar.style.display = 'flex';
@@ -1315,6 +1365,7 @@
             document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
 
             if (show) {
+                document.getElementById('capo-selector').style.display = 'none';
                 editor.style.display = 'block';
 
                 const select = document.getElementById('song-block-select');
@@ -1331,6 +1382,7 @@
                     });
                 }
             } else {
+                document.getElementById('capo-selector').style.display = 'inline-block';
                 mainSections().forEach(sec => sec.style.display = 'block'); // Restore main view
             }
         }
@@ -1731,43 +1783,35 @@
         });
 
         // --- DATA BACKUP LOGIC ---
-        document.getElementById('export-backup-btn').addEventListener('click', () => {
-            // Bundle up both blocks and songs
-            const appData = {
-                chordBlocks: JSON.parse(localStorage.getItem('chordBlocks') || '[]'),
-                chordSongs: JSON.parse(localStorage.getItem('chordSongs') || '[]')
-            };
+        document.getElementById('library-settings-menu').addEventListener('change', (e) => {
+            const action = e.target.value;
+            e.target.value = ""; // Instantly reset back to "Settings" placeholder
 
-            if (appData.chordBlocks.length === 0 && appData.chordSongs.length === 0) {
-                return alert("Your library is empty. Nothing to backup!");
+            if (action === 'backup') {
+                const appData = {
+                    chordBlocks: JSON.parse(localStorage.getItem('chordBlocks') || '[]'),
+                    chordSongs: JSON.parse(localStorage.getItem('chordSongs') || '[]')
+                };
+
+                if (appData.chordBlocks.length === 0 && appData.chordSongs.length === 0) {
+                    return alert("Your library is empty. Nothing to backup!");
+                }
+
+                const dataString = JSON.stringify(appData, null, 2);
+                const blob = new Blob([dataString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.href = url;
+                const dateStamp = new Date().toISOString().slice(0, 10);
+                downloadAnchor.download = `chord-helper-backup-${dateStamp}.json`;
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                document.body.removeChild(downloadAnchor);
+                URL.revokeObjectURL(url);
+
+            } else if (action === 'load') {
+                document.getElementById('import-backup-file').click();
             }
-
-            // Format as readable JSON
-            const dataString = JSON.stringify(appData, null, 2);
-
-            // Create the downloadable Blob
-            const blob = new Blob([dataString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-
-            // Create invisible trigger link
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.href = url;
-
-            // Timestamp the file
-            const dateStamp = new Date().toISOString().slice(0, 10);
-            downloadAnchor.download = `chord-helper-backup-${dateStamp}.json`;
-
-            // Execute download and cleanup
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            document.body.removeChild(downloadAnchor);
-            URL.revokeObjectURL(url);
-        });
-
-        // --- DATA RESTORE LOGIC ---
-        // 1. Route button click to the hidden file input
-        document.getElementById('import-backup-btn').addEventListener('click', () => {
-            document.getElementById('import-backup-file').click();
         });
 
         // 2. Handle the file upload safely
@@ -1975,10 +2019,14 @@
                     titleLabel.style.cssText = 'font-weight: bold; font-size: 16px; text-align: center;';
                     const displayVariant = chord.variant === 'major' ? '' : chord.variant;
 
+                    // Visual label mapping
+                    const patternLabels = { down: '↓ Down', up: '↑ Up', arp: '≈ Arp', chop: '✕ Chop' };
+                    const patternText = chord.strumPattern ? patternLabels[chord.strumPattern] : '↓ Down';
+
                     if (chord.capo > 0) {
-                        titleLabel.innerHTML = `${chord.root} ${displayVariant}<br><span style="font-size: 13px; font-weight: normal; color: var(--accent);">Capo ${chord.capo} (Play ${chord.displayRoot})</span>`;
+                        titleLabel.innerHTML = `${chord.root} ${displayVariant}<br><span style="font-size: 13px; font-weight: normal; color: var(--accent);">Capo ${chord.capo} (Play ${chord.displayRoot})</span><br><span style="font-size: 12px; font-weight: normal; opacity: 0.8;">${patternText}</span>`;
                     } else {
-                        titleLabel.innerText = `${chord.root} ${displayVariant}`.trim();
+                        titleLabel.innerHTML = `${chord.root} ${displayVariant}<br><span style="font-size: 12px; font-weight: normal; opacity: 0.8;">${patternText}</span>`;
                     }
 
                     const chartDiv = document.createElement('div');
@@ -2037,7 +2085,15 @@
             if (!isAutoStrumOn || currentFocusIndex < 0 || !flatPerformanceChords[currentFocusIndex]) return;
             const chord = flatPerformanceChords[currentFocusIndex];
             if (chord.isRest) return;
-            playStrum(chord.fingers, chord.baseFret, chord.capo || 0);
+
+            // Check if the user is testing a global override pattern
+            const overrideSelect = document.getElementById('strum-pattern-select');
+            const overridePattern = overrideSelect ? overrideSelect.value : 'none';
+
+            // If override is 'none', use the saved per-chord pattern (defaulting to 'down')
+            const finalPattern = (overridePattern !== 'none') ? overridePattern : (chord.strumPattern || 'down');
+
+            playStrum(chord.fingers, chord.baseFret, chord.capo || 0, finalPattern);
         }
 
         function metronomeTick() {
